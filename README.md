@@ -24,8 +24,6 @@ Install the required peer dependencies (required by the library at runtime):
 ```bash
 npm install --save nativewind react react-native react-native-awesome-slider react-native-blob-util react-native-gesture-handler react-native-orientation-locker react-native-reanimated react-native-safe-area-context react-native-svg react-native-system-navigation-bar react-native-video react-native-worklets tailwindcss
 # or with yarn
-`playerState` now includes an `isLive` boolean indicating whether the currently loaded
-media is a live stream (true for HLS live playlists or streams without a finite duration).
 yarn add nativewind react react-native react-native-awesome-slider react-native-blob-util react-native-gesture-handler react-native-orientation-locker react-native-reanimated react-native-safe-area-context react-native-svg react-native-system-navigation-bar react-native-video react-native-worklets tailwindcss
 ```
 
@@ -124,45 +122,150 @@ import { usePlayerController } from "react-native-cross-player";
 
 `VideoPlayer` is a small wrapper that wires `usePlayerController` and `PlayerControls` together. Important props:
 
-| Prop           | Type                                         | Description                               |
-| -------------- | -------------------------------------------- | ----------------------------------------- | --------------- | ---------------------------------------------------------------------------------- |
-| `videoTitle`   | `string`                                     | Title displayed in the controls header    |
-| `language`     | `Languages`                                  | Localization setting (default `en`)       |
-| `playerConfig` | `Omit<PlayerControllerProps, "playerViewRef" | "videoRef"                                | "controlsRef">` | Full runtime configuration for `usePlayerController`. Key fields: see table below. |
-| `viewStyle`    | `StyleProp<ViewStyle>`                       | Style for the container view              |
-| `videoStyle`   | `StyleProp<ViewStyle>`                       | Style applied to the native video element |
+<table>
+<thead>
+  <tr>
+    <th>Prop</th>
+    <th>Type</th>
+    <th>Default</th>
+    <th>Required</th>
+    <th>Description</th>
+  </tr>
+</thead>
+<tbody>
+  <tr>
+    <td><code>videoTitle</code></td>
+    <td><code>string</code></td>
+    <td>—</td>
+    <td>No</td>
+    <td>Title displayed in the controls header</td>
+  </tr>
+  <tr>
+    <td><code>language</code></td>
+    <td><code>Languages</code></td>
+    <td><code>en</code></td>
+    <td>No</td>
+    <td>Localization setting</td>
+  </tr>
+  <tr>
+    <td><code>playerConfig</code></td>
+    <td><code>Omit&lt;PlayerControllerProps, "playerViewRef" | "videoRef" | "controlsRef"&gt;</code></td>
+    <td><code>{}</code></td>
+    <td>No</td>
+    <td>Full runtime configuration for <code>usePlayerController</code>. See key fields below.</td>
+  </tr>
+  <tr>
+    <td><code>viewStyle</code></td>
+    <td><code>StyleProp&lt;ViewStyle&gt;</code></td>
+    <td>—</td>
+    <td>No</td>
+    <td>Style for the outer container view</td>
+  </tr>
+  <tr>
+    <td><code>videoStyle</code></td>
+    <td><code>StyleProp&lt;ViewStyle&gt;</code></td>
+    <td>—</td>
+    <td>No</td>
+    <td>Style applied to the native video element</td>
+  </tr>
+</tbody>
+</table>
+
+Example usage (concise `playerConfig`):
+
+```ts
+const playerConfig = {
+	videoSources: [{ uri: 'https://example.com/stream.m3u8' }],
+	initialVideoSource: -1,
+	autoStart: false,
+	proxyURL: 'https://proxy.example.com'
+};
+
+<VideoPlayer playerConfig={playerConfig} />
+```
 
 Key `playerConfig` fields (examples):
 
-| Field                            | Type               | Description                                                                                                                |
-| -------------------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------- |
-| `videoSources`                   | `VideoSource[]`    | List of sources to present in the sources menu                                                                             |
-| `subtitleSources`                | `SubtitleSource[]` | List of subtitle tracks to offer                                                                                           |
-| `initialVideoSource`             | `number`           | Index to auto-select a video source on mount (default `-1`)                                                                |
-| `initialSubtitleSource`          | `number`           | Index to auto-select a subtitle (default `-1`)                                                                             |
-| `initialAudioTrack`              | `number`           | Index to auto-select an audio track (applied after load; default `-1`)                                                     |
-| `autoStart`                      | `boolean`          | Start playback automatically after load (default `false`)                                                                  |
-| `startPosition`                  | `number`           | Seek position (seconds) applied on initial load (default `0`)                                                              |
-| `proxyURL`                       | `string`           | Proxy tunnel URL used for playlist and fragment requests                                                                   |
-| `lazyLoadSources`                | `boolean`          | Defer creation of blob/playlist URLs until first use (default `true`)                                                      |
-| `preservePlaybackOnSourceChange` | `boolean`          | Preserve current time when switching sources (default `true`)                                                              |
-| `maxResolutionHeight`            | `number`           | New: prefer/filter quality levels with height <= this value. Useful to cap resolution for bandwidth or device constraints. |
+<table>
+<thead>
+  <tr>
+    <th>Field</th>
+    <th>Type</th>
+    <th>Default</th>
+    <th>Description</th>
+  </tr>
+</thead>
+<tbody>
+  <tr>
+    <td><code>videoSources</code></td>
+    <td><code>VideoSource[]</code></td>
+    <td><code>[]</code></td>
+    <td>List of sources to present in the sources menu</td>
+  </tr>
+  <tr>
+    <td><code>subtitleSources</code></td>
+    <td><code>SubtitleSource[]</code></td>
+    <td><code>[]</code></td>
+    <td>List of subtitle tracks to offer</td>
+  </tr>
+  <tr>
+    <td><code>initialVideoSource</code></td>
+    <td><code>number</code></td>
+    <td><code>-1</code></td>
+    <td>Index to auto-select a video source on mount</td>
+  </tr>
+  <tr>
+    <td><code>initialSubtitleSource</code></td>
+    <td><code>number</code></td>
+    <td><code>-1</code></td>
+    <td>Index to auto-select a subtitle</td>
+  </tr>
+  <tr>
+    <td><code>initialAudioTrack</code></td>
+    <td><code>number</code></td>
+    <td><code>-1</code></td>
+    <td>Index to auto-select an audio track (applied after load)</td>
+  </tr>
+  <tr>
+    <td><code>autoStart</code></td>
+    <td><code>boolean</code></td>
+    <td><code>false</code></td>
+    <td>Start playback automatically after load</td>
+  </tr>
+  <tr>
+    <td><code>startPosition</code></td>
+    <td><code>number</code></td>
+    <td><code>0</code></td>
+    <td>Seek position (seconds) applied on initial load</td>
+  </tr>
+  <tr>
+    <td><code>proxyURL</code></td>
+    <td><code>string</code></td>
+    <td>—</td>
+    <td>Proxy tunnel URL used for playlist and fragment requests</td>
+  </tr>
+  <tr>
+    <td><code>lazyLoadSources</code></td>
+    <td><code>boolean</code></td>
+    <td><code>true</code></td>
+    <td>Defer creation of blob/playlist URLs until first use</td>
+  </tr>
+  <tr>
+    <td><code>preservePlaybackOnSourceChange</code></td>
+    <td><code>boolean</code></td>
+    <td><code>true</code></td>
+    <td>Preserve current time when switching sources</td>
+  </tr>
+  <tr>
+    <td><code>maxResolutionHeight</code></td>
+    <td><code>number</code></td>
+    <td>—</td>
+    <td>Prefer/filter quality levels with height &lt;= this value. Useful to cap resolution for bandwidth or device constraints.</td>
+  </tr>
+</tbody>
+</table>
 
 For the full API (controller methods, control props, types and helper exports) see [API.md](API.md).
-
-## Development
-
-- Run tests:
-
-```bash
-npm test
-```
-
-- Build (uses react-native-builder-bob configured in package.json):
-
-```bash
-npm run build
-```
 
 ## Contributing
 
@@ -170,11 +273,6 @@ Contributions are welcome. Open an issue or submit a PR. Follow the code style i
 
 ## License
 
-MIT — see [LICENSE](LICENSE)
+This project is licensed under the MIT License. See the full license text in [LICENSE](LICENSE).
 
 ---
-
-If you'd like, I can also:
-
-- Expand the API section with exact exported function and prop signatures (pulling names from each source file).
-- Add detailed prop tables for `VideoPlayer` and `PlayerControls`.

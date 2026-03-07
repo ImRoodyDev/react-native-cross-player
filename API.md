@@ -14,29 +14,78 @@ This file documents the public API of react-native-cross-player. It's extracted 
 
 ### `AudioTrack`
 
-| Property |     Type | Description                                               |
-| -------- | -------: | --------------------------------------------------------- |
-| `id`     | `number` | Index or id of the audio track (matches HLS/native index) |
-| `name`   | `string` | Display name for the audio track                          |
-| `lang?`  | `string` | Optional ISO language code                                |
+<table>
+<thead>
+  <tr>
+    <th>Property</th>
+    <th>Type</th>
+    <th>Description</th>
+  </tr>
+</thead>
+<tbody>
+  <tr>
+    <td><code>id</code></td>
+    <td><code>number</code></td>
+    <td>Index or id of the audio track (matches HLS/native index)</td>
+  </tr>
+  <tr>
+    <td><code>name</code></td>
+    <td><code>string</code></td>
+    <td>Display name for the audio track</td>
+  </tr>
+  <tr>
+    <td><code>lang?</code></td>
+    <td><code>string</code></td>
+    <td>Optional ISO language code</td>
+  </tr>
+</tbody>
+</table>
 
 ### `QualityLevel`
 
-| Property  |     Type | Description                                    |
-| --------- | -------: | ---------------------------------------------- |
-| `id`      | `number` | Unique id for level (HLS index or -1 for auto) |
-| `height`  | `number` | Vertical resolution                            |
-| `width`   | `number` | Horizontal resolution                          |
-| `bitrate` | `number` | Level bitrate                                  |
-| `name`    | `string` | Human label (e.g. `720p`)                      |
+<table>
+<thead>
+  <tr>
+    <th>Property</th>
+    <th>Type</th>
+    <th>Description</th>
+  </tr>
+</thead>
+<tbody>
+  <tr>
+    <td><code>id</code></td>
+    <td><code>number</code></td>
+    <td>Unique id for level (HLS index or -1 for auto)</td>
+  </tr>
+  <tr>
+    <td><code>height</code></td>
+    <td><code>number</code></td>
+    <td>Vertical resolution</td>
+  </tr>
+  <tr>
+    <td><code>width</code></td>
+    <td><code>number</code></td>
+    <td>Horizontal resolution</td>
+  </tr>
+  <tr>
+    <td><code>bitrate</code></td>
+    <td><code>number</code></td>
+    <td>Level bitrate</td>
+  </tr>
+  <tr>
+    <td><code>name</code></td>
+    <td><code>string</code></td>
+    <td>Human label (e.g. <code>720p</code>)</td>
+  </tr>
+</tbody>
+</table>
 
 ## `usePlayerController` (hook)
 
 See `src/hooks/usePlayerController.ts` for full typings and runtime options. Key points:
 
 - Returns `playerState`, `nativeVideoProps`, `playbackResources` and `controls`.
-- `playerState` now includes an `isLive: boolean` flag that indicates whether the
-- loaded media is a live stream (HLS live playlist or a source with no finite duration).
+- `playerState` now includes an `isLive: boolean` flag that indicates whether the loaded media is a live stream (HLS live playlist or a source with no finite duration).
 - Supports `initialVideoSource`, `initialSubtitleSource`, and `initialAudioTrack` (audio applied after media load).
 - Accepts `maxResolutionHeight` to help filter or prefer quality levels when building level lists.
 
