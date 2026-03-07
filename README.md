@@ -65,20 +65,6 @@ module.exports = {
 };
 ```
 
-And your `tailwind.config.js` includes the library in the content paths:
-
-```js
-module.exports = {
-	content: [
-		"./app/**/*.{js,jsx,ts,tsx}",
-		"./src/**/*.{js,jsx,ts,tsx}",
-		// Include react-native-cross-player source files
-		"./node_modules/react-native-cross-player/src/**/*.{js,jsx,ts,tsx}"
-	]
-	// ... rest of config
-};
-```
-
 ## Usage
 
 Basic usage in a React Native app:
