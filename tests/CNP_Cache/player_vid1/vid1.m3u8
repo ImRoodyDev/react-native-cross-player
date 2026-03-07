@@ -1,0 +1,6 @@
+#EXTM3U
+#EXT-X-TARGETDURATION:10
+#EXTINF:10,
+https://example.com/dir/dir2/segment1.ts
+#EXTINF:10,
+https://example.com/dir/dir2/segment2.ts
