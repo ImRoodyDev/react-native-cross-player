@@ -15,13 +15,11 @@ import PlayerGesture from "./PlayerGesture";
 import { t } from "../libs/localization";
 import ComponentStatus from "./ComponentStatus";
 import PlayerDropdown from "./PlayerDropdown";
-import { Slider } from "react-native-awesome-slider";
+import { Slider, SliderThemeType } from "react-native-awesome-slider";
 import { formatTime } from "../utils/helpers";
 import TimeDisplayer from "./TimeDisplayer";
 import { PlaybackResources, PlayerState, VideoControls, AudioTrack } from "../types/player";
-import { CNPLogger } from "../utils/logger";
 import { SubtitleSource } from "../types/media";
-import clsx from "clsx";
 
 export type ControlsProps = {
 	videoTitle: string;
@@ -30,6 +28,7 @@ export type ControlsProps = {
 	playerState: PlayerState;
 	resources: PlaybackResources;
 	visibilityDuration?: number;
+	theme?: SliderThemeType;
 	onControlsVisibilityChange?: (visible: boolean) => void;
 	onClosePlayer?: () => void;
 	onNextVideo?: () => void;
@@ -44,7 +43,7 @@ export type PlayerControlsRef = {
 
 const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControlsRef>) => {
 	// Destructuring props
-	const { visibilityDuration = 3000 } = props;
+	const { visibilityDuration = 3000, theme } = props;
 
 	// Hooks
 	const sizes = useResponsiveSize();
@@ -203,6 +202,11 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 						backgroundColor={"#0000005f"}
 						selectedBackgroundColor={zinc[700]}
 						pressedBackgroundColor={zinc[600]}
+						style={{
+							outlineColor: "white",
+							outlineStyle: "solid",
+							outlineWidth: 1
+						}}
 					/>
 					<Text className={"player-title"}>{props.videoTitle}</Text>
 				</View>
@@ -252,7 +256,7 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 							onSelect={(_, index) => props.controls.setResolution(index)}
 							afterSelect={closeDropdown}
 							getItemText={(i) => i.name}
-						/>{" "}
+						/>
 						{/* Audio track selector — only rendered when the media has multiple audio tracks */}
 						<PlayerDropdown
 							open={triggeredDropdown == 3}
@@ -262,7 +266,7 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 							onSelect={(_, index) => props.controls.setAudioTrack(index)}
 							afterSelect={closeDropdown}
 							getItemText={(i: AudioTrack) => (i.lang ? `${i.name} (${i.lang})` : i.name)}
-						/>{" "}
+						/>
 					</View>
 				</View>
 				<View className={"player-progress"} style={{ height: sizes.span6 - 2 }}>
@@ -285,7 +289,8 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 							minimumTrackTintColor: sky[500],
 							maximumTrackTintColor: zinc[700],
 							cacheTrackTintColor: zinc[500],
-							bubbleBackgroundColor: sky[500]
+							bubbleBackgroundColor: sky[500],
+							...theme
 						}}
 						bubbleTextStyle={{
 							fontSize: sizes.span2,

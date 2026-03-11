@@ -676,13 +676,17 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 		setRate(rate);
 	}, []);
 
-	const setCurrentTime = useCallback((position: number) => {
-		if (videoRef.current && typeof position === "number" && isFinite(position)) {
-			videoRef.current.seek(position);
-		} else {
-			CNPLogger.warn(`Attempted to seek with an invalid position: ${position}`);
-		}
-	}, []);
+	const setCurrentTime = useCallback(
+		(position: number) => {
+			if (sourceId === -1) return;
+			if (videoRef.current && typeof position === "number" && isFinite(position)) {
+				videoRef.current.seek(position);
+			} else {
+				CNPLogger.warn(`Attempted to seek with an invalid position: ${position}`);
+			}
+		},
+		[sourceId]
+	);
 
 	const setFullscreen = useCallback((enable: boolean) => {
 		requestFullscreen(enable);

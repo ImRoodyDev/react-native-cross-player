@@ -104,6 +104,65 @@ See `src/hooks/usePlayerController.ts` for full typings and runtime options. Key
 - `VideoPlayer` — high-level component that wires `usePlayerController` and `PlayerControls`.
 - `PlayerControls` — UI controls and dropdowns for sources, subtitles, audio tracks and quality.
 
+### `VideoPlayerProps`
+
+<table>
+<thead>
+  <tr>
+    <th>Property</th>
+    <th>Type</th>
+    <th>Description</th>
+  </tr>
+</thead>
+<tbody>
+  <tr>
+    <td><code>videoTitle</code></td>
+    <td><code>string</code></td>
+    <td>Title shown in the player controls header.</td>
+  </tr>
+  <tr>
+    <td><code>nextLabel?</code></td>
+    <td><code>string</code></td>
+    <td>Optional label for the next-video action button.</td>
+  </tr>
+  <tr>
+    <td><code>language?</code></td>
+    <td><code>Languages</code></td>
+    <td>Localization language used by the built-in controls.</td>
+  </tr>
+  <tr>
+    <td><code>playerConfig</code></td>
+    <td><code>Omit&lt;PlayerControllerProps, "playerViewRef" | "videoRef" | "controlsRef"&gt;</code></td>
+    <td>Configuration passed to <code>usePlayerController</code>.</td>
+  </tr>
+  <tr>
+    <td><code>viewStyle?</code></td>
+    <td><code>StyleProp&lt;ViewStyle&gt;</code></td>
+    <td>Style applied to the outer player container.</td>
+  </tr>
+  <tr>
+    <td><code>videoStyle?</code></td>
+    <td><code>StyleProp&lt;ViewStyle&gt;</code></td>
+    <td>Style applied to the rendered video element.</td>
+  </tr>
+  <tr>
+    <td><code>theme?</code></td>
+    <td><code>SliderThemeType</code></td>
+    <td>Optional theme object forwarded to the progress slider from <code>react-native-awesome-slider</code>.</td>
+  </tr>
+  <tr>
+    <td><code>onClosePlayer?</code></td>
+    <td><code>() =&gt; void</code></td>
+    <td>Called when the close button is pressed.</td>
+  </tr>
+  <tr>
+    <td><code>onNextVideo?</code></td>
+    <td><code>() =&gt; void</code></td>
+    <td>Called when the next-video action is pressed.</td>
+  </tr>
+</tbody>
+</table>
+
 ## Notes on audio tracks
 
 - `audioTracks` are discovered at load time (HLS manifest or native `onLoad`).

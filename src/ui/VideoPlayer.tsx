@@ -10,6 +10,7 @@ import { View } from "./styled";
 import { CNPLogger } from "../utils/logger";
 import clsx from "clsx";
 import { State } from "../hooks/useComponentState";
+import { SliderThemeType } from "react-native-awesome-slider";
 
 export type VideoPlayerProps = {
 	videoTitle: string;
@@ -18,6 +19,7 @@ export type VideoPlayerProps = {
 	playerConfig: Omit<PlayerControllerProps, "playerViewRef" | "videoRef" | "controlsRef">;
 	viewStyle?: StyleProp<ViewStyle>;
 	videoStyle?: StyleProp<ViewStyle>;
+	theme?: SliderThemeType;
 	onClosePlayer?: () => void;
 	onNextVideo?: () => void;
 };
@@ -31,7 +33,7 @@ export type VideoPlayerRef = {
 };
 
 const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) => {
-	const { videoTitle, language, playerConfig, viewStyle, videoStyle, onNextVideo, nextLabel } = props;
+	const { videoTitle, language, playerConfig, viewStyle, videoStyle, onNextVideo, nextLabel, theme } = props;
 	const videoRef = React.useRef<VideoRef>(null);
 	const controlsRef = React.useRef<PlayerControlsRef>(null);
 	const playerViewRef = React.useRef<RNView>(null);
@@ -81,6 +83,7 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 
 			<PlayerControls
 				ref={controlsRef}
+				theme={theme}
 				videoTitle={videoTitle}
 				controls={controls}
 				resources={playbackResources}

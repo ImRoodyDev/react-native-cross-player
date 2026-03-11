@@ -74,11 +74,21 @@ import React from "react";
 import { VideoPlayer } from "react-native-cross-player";
 
 export default function App() {
+	const playerConfig = {
+		videoSources: [{ uri: "https://example.com/video.m3u8" }]
+	};
+
 	return (
 		<VideoPlayer
-			source={{ uri: "https://example.com/video.m3u8" }}
-			style={{ flex: 1 }}
-			// additional props supported by the component (see types in src/types)
+			videoTitle="Demo"
+			playerConfig={playerConfig}
+			viewStyle={{ flex: 1 }}
+			theme={{
+				minimumTrackTintColor: "#0ea5e9",
+				maximumTrackTintColor: "#3f3f46",
+				cacheTrackTintColor: "#71717a",
+				bubbleBackgroundColor: "#0ea5e9"
+			}}
 		/>
 	);
 }
@@ -123,7 +133,7 @@ import { usePlayerController } from "react-native-cross-player";
     <td><code>videoTitle</code></td>
     <td><code>string</code></td>
     <td>—</td>
-    <td>No</td>
+    <td>Yes</td>
     <td>Title displayed in the controls header</td>
   </tr>
   <tr>
@@ -137,7 +147,7 @@ import { usePlayerController } from "react-native-cross-player";
     <td><code>playerConfig</code></td>
     <td><code>Omit&lt;PlayerControllerProps, "playerViewRef" | "videoRef" | "controlsRef"&gt;</code></td>
     <td><code>{}</code></td>
-    <td>No</td>
+    <td>Yes</td>
     <td>Full runtime configuration for <code>usePlayerController</code>. See key fields below.</td>
   </tr>
   <tr>
@@ -154,8 +164,31 @@ import { usePlayerController } from "react-native-cross-player";
     <td>No</td>
     <td>Style applied to the native video element</td>
   </tr>
+  <tr>
+    <td><code>theme</code></td>
+    <td><code>SliderThemeType</code></td>
+    <td>—</td>
+    <td>No</td>
+    <td>Optional slider theme forwarded to the built-in progress bar from <code>react-native-awesome-slider</code></td>
+  </tr>
 </tbody>
 </table>
+
+`theme` lets you override the colors used by the built-in seek slider without replacing the controls UI.
+
+```tsx
+import { VideoPlayer } from "react-native-cross-player";
+import type { SliderThemeType } from "react-native-awesome-slider";
+
+const sliderTheme: SliderThemeType = {
+	minimumTrackTintColor: "#0ea5e9",
+	maximumTrackTintColor: "#3f3f46",
+	cacheTrackTintColor: "#71717a",
+	bubbleBackgroundColor: "#0ea5e9"
+};
+
+<VideoPlayer videoTitle="Demo" playerConfig={playerConfig} theme={sliderTheme} />;
+```
 
 Example usage (concise `playerConfig`):
 
