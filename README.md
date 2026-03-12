@@ -171,6 +171,13 @@ import { usePlayerController } from "react-native-cross-player";
     <td>No</td>
     <td>Optional slider theme forwarded to the built-in progress bar from <code>react-native-awesome-slider</code></td>
   </tr>
+  <tr>
+    <td><code>onControlVisibilityChange</code></td>
+    <td><code>(visible: boolean) =&gt; void</code></td>
+    <td>—</td>
+    <td>No</td>
+    <td>Called whenever the built-in controls become visible or hidden</td>
+  </tr>
 </tbody>
 </table>
 
@@ -203,10 +210,12 @@ type VideoPlayerRef = {
 	play: () => void;
 	pause: () => void;
 	getCurrentTime: () => Promise<number>;
+  getCurrentVideoIndex: () => number;
+  getCurrentSubtitleIndex: () => number;
 };
 ```
 
-`setSubtitle(index)` selects a subtitle track by index, and `setVideoSource(index)` switches the active video source by index.
+`setSubtitle(index)` selects a subtitle track by index, `setVideoSource(index)` switches the active video source by index, and the getter methods return the currently selected source and subtitle indexes.
 
 Example usage (concise `playerConfig`):
 

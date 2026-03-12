@@ -1,6 +1,6 @@
 "use client";
 
-import React, { forwardRef, useEffect, useImperativeHandle } from "react";
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle } from "react";
 import { StatusBar, StyleProp, View as RNView, ViewStyle } from "react-native";
 import Video, { VideoRef } from "react-native-video";
 import PlayerControls, { PlayerControlsRef } from "./PlayerControls";
@@ -22,6 +22,7 @@ export type VideoPlayerProps = {
 	theme?: SliderThemeType;
 	onClosePlayer?: () => void;
 	onNextVideo?: () => void;
+	onControlVisibilityChange?: (visible: boolean) => void;
 };
 
 export type VideoPlayerRef = {
@@ -37,26 +38,18 @@ export type VideoPlayerRef = {
 };
 
 const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) => {
-	const { videoTitle, language, playerConfig, viewStyle, videoStyle, onNextVideo, nextLabel, theme } = props;
+	const { videoTitle, language, playerConfig, viewStyle, videoStyle, onNextVideo, nextLabel, theme, onControlVisibilityChange } = props;
 	const videoRef = React.useRef<VideoRef>(null);
 	const controlsRef = React.useRef<PlayerControlsRef>(null);
 	const playerViewRef = React.useRef<RNView>(null);
 	const [controlsVisible, setControlsVisible] = React.useState(true);
 
-	useImperativeHandle(
-		ref,
-		() => ({
-			getCurrentTime: async () => videoRef.current?.getCurrentPosition() ?? videoRef.current?.nativeHtmlVideoRef?.current?.currentTime ?? 0,
-			setState: (state: State) => controlsRef.current?.setControlState(state),
-			setSubtitle: (index: number) => controls.setSubtitle(index),
-			setVideoSource: (index: number) => controls.setSource(index),
-			seek: (time: number) => videoRef.current?.seek(time),
-			play: () => videoRef.current?.resume(),
-			pause: () => videoRef.current?.pause(),
-			getCurrentVideoIndex: () => playerState.sourceIndex,
-			getCurrentSubtitleIndex: () => playerState.subtitleIndex
-		}),
-		[]
+	const handleControlsVisibilityChange = useCallback(
+		(visible: boolean) => {
+			setControlsVisible(visible);
+			onControlVisibilityChange?.(visible);
+		},
+		[onControlVisibilityChange]
 	);
 
 	// Set language for video localization
@@ -72,6 +65,22 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 		playerViewRef,
 		...playerConfig
 	});
+
+	useImperativeHandle(
+		ref,
+		() => ({
+			getCurrentTime: async () => videoRef.current?.getCurrentPosition() ?? videoRef.current?.nativeHtmlVideoRef?.current?.currentTime ?? 0,
+			setState: (state: State) => controlsRef.current?.setControlState(state),
+			setSubtitle: (index: number) => controls.setSubtitle(index),
+			setVideoSource: (index: number) => controls.setSource(index),
+			seek: (time: number) => videoRef.current?.seek(time),
+			play: () => videoRef.current?.resume(),
+			pause: () => videoRef.current?.pause(),
+			getCurrentVideoIndex: () => playerState.sourceIndex,
+			getCurrentSubtitleIndex: () => playerState.subtitleIndex
+		}),
+		[controls, playerState.sourceIndex, playerState.subtitleIndex]
+	);
 
 	return (
 		<View id={"video-player"} className={clsx("video-player", controlsVisible && "video-controls-on")} ref={playerViewRef} style={viewStyle}>
@@ -97,7 +106,7 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 				resources={playbackResources}
 				playerState={playerState}
 				nextLabel={nextLabel}
-				onControlsVisibilityChange={setControlsVisible}
+				onControlsVisibilityChange={handleControlsVisibilityChange}
 				onClosePlayer={props.onClosePlayer}
 				onNextVideo={onNextVideo}
 			/>

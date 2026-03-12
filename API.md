@@ -151,6 +151,11 @@ See `src/hooks/usePlayerController.ts` for full typings and runtime options. Key
     <td>Optional theme object forwarded to the progress slider from <code>react-native-awesome-slider</code>.</td>
   </tr>
   <tr>
+    <td><code>onControlVisibilityChange?</code></td>
+    <td><code>(visible: boolean) =&gt; void</code></td>
+    <td>Called whenever the built-in controls are shown or hidden.</td>
+  </tr>
+  <tr>
     <td><code>onClosePlayer?</code></td>
     <td><code>() =&gt; void</code></td>
     <td>Called when the close button is pressed.</td>
@@ -208,6 +213,16 @@ See `src/hooks/usePlayerController.ts` for full typings and runtime options. Key
     <td><code>getCurrentTime</code></td>
     <td><code>() =&gt; Promise&lt;number&gt;</code></td>
     <td>Returns the current playback time in seconds.</td>
+  </tr>
+  <tr>
+    <td><code>getCurrentVideoIndex</code></td>
+    <td><code>() =&gt; number</code></td>
+    <td>Returns the currently selected video source index.</td>
+  </tr>
+  <tr>
+    <td><code>getCurrentSubtitleIndex</code></td>
+    <td><code>() =&gt; number</code></td>
+    <td>Returns the currently selected subtitle index.</td>
   </tr>
 </tbody>
 </table>
