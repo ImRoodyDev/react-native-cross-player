@@ -1,8 +1,8 @@
 // External imports
-import { TextStyle, View as RNView } from "react-native";
+import { TextStyle, View as RNView, ColorValue } from "react-native";
 import React, { memo, Ref, useMemo } from "react";
 import clsx from "clsx";
-import { CustomButton, CustomButtonProps, joinClsx, PressableStyle } from "react-native-cross-elements";
+import { ButtonAllowedStyle, CustomButton, CustomButtonProps, joinClsx, PressableStyle } from "react-native-cross-elements";
 
 // Internal imports
 import { Icons, IconType } from "../constants/icons";
@@ -20,37 +20,47 @@ type ButtonProps = {
 	iconSize?: number;
 
 	focusOutlined?: boolean;
+	focusOutlineColor?: ColorValue;
+
 	borderRadius?: number;
 	hideAndDisable?: boolean;
 } & Omit<CustomButtonProps, "children">;
 
 const Button = React.forwardRef((props: ButtonProps, ref?: Ref<RNView>) => {
 	// Destructure props with defaults
-	const { style, text, textStyle, textClassName, icon, iconSize = 24, borderRadius, focusOutlined, className, ...baseButtonProps } = props;
+	const {
+		style,
+		text,
+		textStyle,
+		textClassName,
+		icon,
+		iconSize = 24,
+		borderRadius,
+		focusOutlined,
+		className,
+		focusOutlineColor = "white",
+		...baseButtonProps
+	} = props;
 
 	// Memoized style extraction to handle dynamic styles
 	const extractedStyle = useMemo((): PressableStyle => {
-		return typeof style === "function"
-			? (state) => {
-					// @ts-ignore
-					const focused = state.focused || state.pressed || state.hovered;
-					const result = style(state);
-					return {
-						...result,
-						borderRadius,
-						...(focused && focusOutlined
-							? {
-									outlineWidth: 1,
-									outlineOffset: 2,
-									outlineStyle: "solid",
-									outlineColor: baseButtonProps.selectedBackgroundColor
-								}
-							: {})
-					};
-				}
-			: // @ts-ignore
-				{ ...style, borderRadius };
-	}, [baseButtonProps.selectedBackgroundColor, borderRadius, focusOutlined, style]);
+		return (state) => {
+			const focused = state.focused || state.pressed || state.hovered;
+			const result: ButtonAllowedStyle = typeof style === "function" ? style(state) : ((style ?? {}) as ButtonAllowedStyle);
+			return {
+				...result,
+				borderRadius,
+				...(focused && focusOutlined
+					? {
+							outlineWidth: 2,
+							outlineOffset: 0,
+							outlineStyle: "solid",
+							outlineColor: focusOutlineColor
+						}
+					: { outline: "none" })
+			};
+		};
+	}, [borderRadius, focusOutlineColor, focusOutlined, style]);
 
 	if (props.hideAndDisable) return null;
 
