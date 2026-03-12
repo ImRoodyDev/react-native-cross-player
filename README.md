@@ -190,6 +190,24 @@ const sliderTheme: SliderThemeType = {
 <VideoPlayer videoTitle="Demo" playerConfig={playerConfig} theme={sliderTheme} />;
 ```
 
+### `VideoPlayer` ref methods
+
+`VideoPlayer` also exposes an imperative ref API for playback and track/source switching.
+
+```tsx
+type VideoPlayerRef = {
+	setState: (state: State) => void;
+	setSubtitle: (index: number) => Promise<void>;
+	setVideoSource: (index: number) => Promise<void>;
+	seek: (time: number) => void;
+	play: () => void;
+	pause: () => void;
+	getCurrentTime: () => Promise<number>;
+};
+```
+
+`setSubtitle(index)` selects a subtitle track by index, and `setVideoSource(index)` switches the active video source by index.
+
 Example usage (concise `playerConfig`):
 
 ```ts

@@ -26,6 +26,8 @@ export type VideoPlayerProps = {
 
 export type VideoPlayerRef = {
 	setState: (state: State) => void;
+	setSubtitle: (index: number) => Promise<void>;
+	setVideoSource: (index: number) => Promise<void>;
 	seek: (time: number) => void;
 	play: () => void;
 	pause: () => void;
@@ -44,6 +46,8 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 		() => ({
 			getCurrentTime: async () => videoRef.current?.getCurrentPosition() ?? videoRef.current?.nativeHtmlVideoRef?.current?.currentTime ?? 0,
 			setState: (state: State) => controlsRef.current?.setControlState(state),
+			setSubtitle: (index: number) => controls.setSubtitle(index),
+			setVideoSource: (index: number) => controls.setSource(index),
 			seek: (time: number) => videoRef.current?.seek(time),
 			play: () => videoRef.current?.resume(),
 			pause: () => videoRef.current?.pause()

@@ -163,6 +163,55 @@ See `src/hooks/usePlayerController.ts` for full typings and runtime options. Key
 </tbody>
 </table>
 
+### `VideoPlayerRef`
+
+<table>
+<thead>
+  <tr>
+    <th>Method</th>
+    <th>Type</th>
+    <th>Description</th>
+  </tr>
+</thead>
+<tbody>
+  <tr>
+    <td><code>setState</code></td>
+    <td><code>(state: State) =&gt; void</code></td>
+    <td>Sets the control overlay state shown by the player UI.</td>
+  </tr>
+  <tr>
+    <td><code>setSubtitle</code></td>
+    <td><code>(index: number) =&gt; Promise&lt;void&gt;</code></td>
+    <td>Selects a subtitle track by index.</td>
+  </tr>
+  <tr>
+    <td><code>setVideoSource</code></td>
+    <td><code>(index: number) =&gt; Promise&lt;void&gt;</code></td>
+    <td>Switches the active video source by index.</td>
+  </tr>
+  <tr>
+    <td><code>seek</code></td>
+    <td><code>(time: number) =&gt; void</code></td>
+    <td>Seeks playback to the provided time in seconds.</td>
+  </tr>
+  <tr>
+    <td><code>play</code></td>
+    <td><code>() =&gt; void</code></td>
+    <td>Resumes playback.</td>
+  </tr>
+  <tr>
+    <td><code>pause</code></td>
+    <td><code>() =&gt; void</code></td>
+    <td>Pauses playback.</td>
+  </tr>
+  <tr>
+    <td><code>getCurrentTime</code></td>
+    <td><code>() =&gt; Promise&lt;number&gt;</code></td>
+    <td>Returns the current playback time in seconds.</td>
+  </tr>
+</tbody>
+</table>
+
 ## Notes on audio tracks
 
 - `audioTracks` are discovered at load time (HLS manifest or native `onLoad`).
