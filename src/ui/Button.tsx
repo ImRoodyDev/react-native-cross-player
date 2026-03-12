@@ -1,5 +1,5 @@
 // External imports
-import { TextStyle, View as RNView, ColorValue } from "react-native";
+import { TextStyle, View as RNView, ColorValue, Platform } from "react-native";
 import React, { memo, Ref, useMemo } from "react";
 import clsx from "clsx";
 import { ButtonAllowedStyle, CustomButton, CustomButtonProps, joinClsx, PressableStyle } from "react-native-cross-elements";
@@ -48,16 +48,17 @@ const Button = React.forwardRef((props: ButtonProps, ref?: Ref<RNView>) => {
 			const focused = state.focused || state.pressed || state.hovered;
 			const result: ButtonAllowedStyle = typeof style === "function" ? style(state) : ((style ?? {}) as ButtonAllowedStyle);
 			return {
+				// Because on we default button have outline on it
+				...(Platform.OS == "web" && { outline: "none" }),
 				...result,
 				borderRadius,
-				...(focused && focusOutlined
-					? {
-							outlineWidth: 2,
-							outlineOffset: 0,
-							outlineStyle: "solid",
-							outlineColor: focusOutlineColor
-						}
-					: { outline: "none" })
+				...(focused &&
+					focusOutlined && {
+						outlineWidth: 2,
+						outlineOffset: 0,
+						outlineStyle: "solid",
+						outlineColor: focusOutlineColor
+					})
 			};
 		};
 	}, [borderRadius, focusOutlineColor, focusOutlined, style]);
