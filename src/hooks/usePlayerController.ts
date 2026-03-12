@@ -280,21 +280,26 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 		}
 	}, []);
 
-	const onBuffer = useCallback((data: OnBufferData) => {
-		const isBuffering = data.isBuffering;
-		if (!isBuffering && bufferTimeoutRef.current) clearTimeout(bufferTimeoutRef.current);
+	const onBuffer = useCallback(
+		(data: OnBufferData) => {
+			// If not sources is set or selected should ignore settign this to loading or idle state
+			if (sourceId === -1 || videoSources.length < 1) return;
+			const isBuffering = data.isBuffering;
+			if (!isBuffering && bufferTimeoutRef.current) clearTimeout(bufferTimeoutRef.current);
 
-		bufferTimeoutRef.current = setTimeout(
-			() => {
-				controlsRef.current?.setControlState({
-					type: isBuffering ? "loading" : "idle",
-					message: isBuffering ? t("LOADING") : ""
-				});
-				bufferTimeoutRef.current = undefined;
-			},
-			isBuffering ? 500 : 0
-		);
-	}, []);
+			bufferTimeoutRef.current = setTimeout(
+				() => {
+					controlsRef.current?.setControlState({
+						type: isBuffering ? "loading" : "idle",
+						message: isBuffering ? t("LOADING") : ""
+					});
+					bufferTimeoutRef.current = undefined;
+				},
+				isBuffering ? 500 : 0
+			);
+		},
+		[sourceId, videoSources]
+	);
 
 	const onLoadMetadata = useCallback(
 		(data?: OnLoadData) => {
