@@ -588,7 +588,7 @@
 }
 
 @media (max-width: 767px) and (min-height: 480px) {
-	.landscape-btn {
+	.only-landscape {
 		display: none;
 	}
 

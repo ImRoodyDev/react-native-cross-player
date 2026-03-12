@@ -3,13 +3,15 @@ import { StyleSheet } from "react-native";
 import Animated, { runOnJS, SharedValue, useAnimatedReaction } from "react-native-reanimated";
 import { formatTime } from "../utils/helpers";
 import { Text, AnimatedView } from "./styled";
+import clsx from "clsx";
 
 interface Props {
 	currentTime: SharedValue<number>;
 	fullTime: SharedValue<number>;
+	className?: string;
 }
 
-const TimeDisplayer = forwardRef(({ currentTime, fullTime }: Props, ref?: any) => {
+const TimeDisplayer = forwardRef(({ currentTime, fullTime, className }: Props, ref?: any) => {
 	const [currentDuration, setCurrentDuration] = useState(0);
 	const [fullDuration, setFullDuration] = useState(0);
 
@@ -34,7 +36,7 @@ const TimeDisplayer = forwardRef(({ currentTime, fullTime }: Props, ref?: any) =
 	);
 
 	return (
-		<AnimatedView ref={ref} style={styles.container} className={"player-time-displayer"}>
+		<AnimatedView ref={ref} style={styles.container} className={clsx("player-time-displayer", className)}>
 			<Text selectable={false} style={styles.timeText} className={"player-time-text"}>
 				{formatTime(currentDuration)}
 			</Text>

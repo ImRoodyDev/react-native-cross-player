@@ -208,7 +208,7 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 							outlineWidth: 2
 						}}
 					/>
-					<Text className={"player-title"}>{props.videoTitle}</Text>
+					<Text className={"only-landscape player-title"}>{props.videoTitle}</Text>
 				</View>
 				<View className={"player-actions"}>
 					{state.type !== "idle" && (
@@ -318,7 +318,7 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 						hideAndDisable={props.playerState.isLive} // Hide and disable seek buttons for live streams
 						onPress={seekBackward}
 						icon="backward_10_seconds"
-						className={`landscape-btn player-button`}
+						className={`only-landscape player-button`}
 						iconSize={defaultIconSize}
 						borderRadius={999999}
 						textColor="white"
@@ -333,7 +333,7 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 						hideAndDisable={props.playerState.isLive} // Hide and disable seek buttons for live streams
 						onPress={seekForward}
 						icon="forward_10_seconds"
-						className={`landscape-btn player-button`}
+						className={`only-landscape player-button`}
 						iconSize={defaultIconSize}
 						borderRadius={999999}
 						textColor="white"
@@ -347,7 +347,7 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 					<Button
 						onPress={toggleMute}
 						icon={props.playerState.volume == 0 ? "volume_slash" : "volume_high"}
-						className={`landscape-btn player-button`}
+						className={`only-landscape player-button`}
 						iconSize={defaultIconSize}
 						borderRadius={999999}
 						textColor="white"
@@ -363,7 +363,7 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 							onPress={props.onNextVideo}
 							icon={"next"}
 							text={props.nextLabel || t("NEXT_VIDEO")}
-							className={"player-button next-button"}
+							className={"only-landscape player-button next-button"}
 							iconSize={defaultIconSize}
 							borderRadius={999999}
 							textColor="white"
