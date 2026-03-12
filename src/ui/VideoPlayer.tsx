@@ -32,6 +32,8 @@ export type VideoPlayerRef = {
 	play: () => void;
 	pause: () => void;
 	getCurrentTime: () => Promise<number>;
+	getCurrentVideoIndex: () => number;
+	getCurrentSubtitleIndex: () => number;
 };
 
 const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) => {
@@ -50,7 +52,9 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 			setVideoSource: (index: number) => controls.setSource(index),
 			seek: (time: number) => videoRef.current?.seek(time),
 			play: () => videoRef.current?.resume(),
-			pause: () => videoRef.current?.pause()
+			pause: () => videoRef.current?.pause(),
+			getCurrentVideoIndex: () => playerState.sourceIndex,
+			getCurrentSubtitleIndex: () => playerState.subtitleIndex
 		}),
 		[]
 	);
