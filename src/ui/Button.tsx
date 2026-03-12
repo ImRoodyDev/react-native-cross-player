@@ -45,11 +45,11 @@ const Button = React.forwardRef((props: ButtonProps, ref?: Ref<RNView>) => {
 									outlineStyle: "solid",
 									outlineColor: baseButtonProps.selectedBackgroundColor
 								}
-							: { outline: "none" })
+							: {})
 					};
 				}
 			: // @ts-ignore
-				{ ...style, borderRadius, outline: "none" };
+				{ ...style, borderRadius };
 	}, [baseButtonProps.selectedBackgroundColor, borderRadius, focusOutlined, style]);
 
 	if (props.hideAndDisable) return null;

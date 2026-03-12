@@ -202,10 +202,11 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 						backgroundColor={"#0000005f"}
 						selectedBackgroundColor={zinc[700]}
 						pressedBackgroundColor={zinc[600]}
+						focusOutlined
 						style={{
 							outlineColor: "white",
 							outlineStyle: "solid",
-							outlineWidth: 1
+							outlineWidth: 2
 						}}
 					/>
 					<Text className={"player-title"}>{props.videoTitle}</Text>
