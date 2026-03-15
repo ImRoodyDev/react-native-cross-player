@@ -20,6 +20,8 @@ export type UseSourcesParams = {
 export function useSources(params: UseSourcesParams) {
 	const { videoSources = [], subtitleSources = [], lazyLoadSources = true, proxyURL, proxyResolver, onLazyLoadSource, videoRef } = params;
 
+	const [initializedVideo, setInitializedVideo] = React.useState(false);
+	const [initializedSubtitle, setInitializedSubtitle] = React.useState(false);
 	const createdSourcesRef = useRef<Map<string, VideoSource>>(new Map());
 	const createdSubtitlesRef = useRef<Map<string, SubtitleSource>>(new Map());
 
@@ -49,8 +51,7 @@ export function useSources(params: UseSourcesParams) {
 		async (subtitle: SubtitleSource) => {
 			if (subtitle.options && !subtitle.options.overrideProxyURL) subtitle.options.overrideProxyURL = proxyURL;
 
-			if (proxyResolver && subtitle.options?.useProxy)
-				subtitle.source = proxyResolver(subtitle.source, proxyURL || "", subtitle.options?.headers || {});
+			if (proxyResolver && subtitle.options?.useProxy) subtitle.source = proxyResolver(subtitle.source, proxyURL || "", subtitle.options?.headers || {});
 
 			const source = await createVTTSource(subtitle, proxyResolver).catch(() => "");
 			subtitle.source = source;
@@ -76,12 +77,14 @@ export function useSources(params: UseSourcesParams) {
 		if (!lazyLoadSources) {
 			for (const video of videoSources) await addVideoSource(video);
 		}
+		setInitializedVideo(true);
 	}, [videoSources, lazyLoadSources, addVideoSource]);
 
 	const initializeSubtitles = useCallback(async () => {
 		if (!lazyLoadSources) {
 			for (const subtitle of subtitleSources) await addSubtitleSource(subtitle);
 		}
+		setInitializedSubtitle(true);
 	}, [subtitleSources, lazyLoadSources, addSubtitleSource]);
 
 	const cleanupSources = useCallback(() => {
@@ -99,6 +102,8 @@ export function useSources(params: UseSourcesParams) {
 	}, []);
 
 	return {
+		initializedVideo,
+		initializedSubtitle,
 		createdSourcesRef,
 		createdSubtitlesRef,
 		addVideoSource,

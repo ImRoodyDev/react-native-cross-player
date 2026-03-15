@@ -178,6 +178,27 @@ import { usePlayerController } from "react-native-cross-player";
     <td>No</td>
     <td>Called whenever the built-in controls become visible or hidden</td>
   </tr>
+  <tr>
+    <td><code>onSourceChange</code></td>
+    <td><code>(index: number, source: VideoSource) =&gt; void</code></td>
+    <td>—</td>
+    <td>No</td>
+    <td>Called when the active video source changes, including initial source selection and imperative/UI-driven switches</td>
+  </tr>
+  <tr>
+    <td><code>onSubtitleChange</code></td>
+    <td><code>(index: number, subtitle: SubtitleSource) =&gt; void</code></td>
+    <td>—</td>
+    <td>No</td>
+    <td>Called when a subtitle track becomes active. It is not fired when subtitles are turned off.</td>
+  </tr>
+  <tr>
+    <td><code>onPlaybackChange</code></td>
+    <td><code>(isPlaying: boolean) =&gt; void</code></td>
+    <td>—</td>
+    <td>No</td>
+    <td>Called when playback toggles between playing and paused after the player has mounted.</td>
+  </tr>
 </tbody>
 </table>
 
@@ -197,6 +218,24 @@ const sliderTheme: SliderThemeType = {
 <VideoPlayer videoTitle="Demo" playerConfig={playerConfig} theme={sliderTheme} />;
 ```
 
+You can observe source and subtitle switches from the built-in UI or imperative ref calls:
+
+```tsx
+<VideoPlayer
+	videoTitle="Demo"
+	playerConfig={playerConfig}
+	onSourceChange={(index, source) => {
+		console.log("Active source", index, source.label);
+	}}
+	onSubtitleChange={(index, subtitle) => {
+		console.log("Active subtitle", index, subtitle.label ?? subtitle.langISO);
+	}}
+	onPlaybackChange={(isPlaying) => {
+		console.log("Playback changed", isPlaying ? "playing" : "paused");
+	}}
+/>
+```
+
 ### `VideoPlayer` ref methods
 
 `VideoPlayer` also exposes an imperative ref API for playback and track/source switching.
@@ -210,8 +249,8 @@ type VideoPlayerRef = {
 	play: () => void;
 	pause: () => void;
 	getCurrentTime: () => Promise<number>;
-  getCurrentVideoIndex: () => number;
-  getCurrentSubtitleIndex: () => number;
+	getCurrentVideoIndex: () => number;
+	getCurrentSubtitleIndex: () => number;
 };
 ```
 

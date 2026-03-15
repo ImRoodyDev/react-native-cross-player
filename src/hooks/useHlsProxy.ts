@@ -3,7 +3,7 @@ import { HlsProxy } from "../controllers/hls-proxy";
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { HlsProxyConfig } from "../types/hls";
 import { SourceRequestOptions } from "../types/media";
-import { OnLoadData, OnVideoErrorData } from "react-native-video";
+import { OnVideoErrorData } from "react-native-video";
 import { CNPLogger } from "../utils/logger";
 
 const DEFAULT_HLS_PROXY_CONFIG: HlsProxyConfig = {

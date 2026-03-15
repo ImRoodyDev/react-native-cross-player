@@ -171,20 +171,28 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 	const { isFullscreen, onFullscreenEnter, onFullscreenExit, requestFullscreen } = useFullscreen({ videoRef, playerViewRef });
 
 	// Source management hooks
-	const { createdSourcesRef, createdSubtitlesRef, addVideoSource, addSubtitleSource, initializeVideos, initializeSubtitles, cleanupSources } = useSources({
-		videoSources,
-		subtitleSources,
-		lazyLoadSources,
-		proxyURL,
-		videoRef,
-		playerId,
-		proxyResolver,
-		onLazyLoadSource
-	});
+	const { createdSourcesRef, createdSubtitlesRef, addVideoSource, addSubtitleSource, initializeVideos, initializeSubtitles, cleanupSources, initializedVideo } =
+		useSources({
+			videoSources,
+			subtitleSources,
+			lazyLoadSources,
+			proxyURL,
+			videoRef,
+			playerId,
+			proxyResolver,
+			onLazyLoadSource
+		});
 
 	// Initialize state and controller methods here
 	useEffect(() => {
 		isMountedRef.current = true;
+
+		// If video is already initialized skip this
+		if (initializedVideo) {
+			CNPLogger.info("Video already initialized, skipping initialization effect.");
+			CNPLogger.info(`Current video sources:'`, videoSources);
+			return;
+		}
 
 		(async () => {
 			try {
@@ -225,7 +233,7 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 
 		// Run only on mount/unmount or playerId change
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [playerId, videoSources, subtitleSources]);
+	}, [playerId]);
 
 	// initialVideoSource and initialSubtitleSource are applied in the init effect above because
 	// those lists come from props and are available immediately at mount time.
