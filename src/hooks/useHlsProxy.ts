@@ -40,8 +40,15 @@ export function useHlsProxy(props: Props) {
 		hlsRef.current.on(Hls.Events.ERROR, (_, data) => onError(data));
 		if (onAudioTrackSwitched) hlsRef.current.on(Hls.Events.AUDIO_TRACK_SWITCHED, onAudioTrackSwitched);
 
+		// Defer attachMedia to ensure React Native Video Web has flushed `source={undefined}`
+		// and won't overwrite the Hls blob during the same tick.
+		if (videoRef?.current?.nativeHtmlVideoRef?.current) {
+			hlsRef.current.attachMedia(videoRef.current.nativeHtmlVideoRef.current);
+		}
+
 		return () => {
 			if (!hlsRef.current) return;
+			if (videoRef?.current?.nativeHtmlVideoRef?.current) hlsRef.current.detachMedia();
 			hlsRef.current.off(Hls.Events.MANIFEST_PARSED, onManifestParsed);
 			hlsRef.current.off(Hls.Events.LEVEL_SWITCHED, onLevelSwitched);
 			hlsRef.current.off(Hls.Events.ERROR, (_, data) => onError(data));
@@ -50,6 +57,8 @@ export function useHlsProxy(props: Props) {
 	}, [hlsCreated, onManifestParsed, onLevelSwitched, onAudioTrackSwitched, onError]);
 
 	const createHLS = useCallback(() => {
+		CNPLogger.info("HLS Proxy initializing....");
+
 		runDestroy();
 		videoRef?.current?.setSource({ uri: undefined });
 
@@ -62,10 +71,6 @@ export function useHlsProxy(props: Props) {
 				}
 			});
 
-			if (videoRef?.current?.nativeHtmlVideoRef?.current) {
-				hlsRef.current.attachMedia(videoRef.current.nativeHtmlVideoRef.current);
-			}
-
 			setHlsCreated(true);
 		}
 	}, [hlsConfig, videoRef, isHlsSupported, onManifestParsed, onLevelSwitched, onError]);
@@ -74,11 +79,14 @@ export function useHlsProxy(props: Props) {
 		(source: string, options?: SourceRequestOptions, startTime?: number) => {
 			CNPLogger.info("HLS_SET_SOURCE: ", { source, options, startTime });
 			if (!isHlsSupported) return;
+			// Recreate if not present
 			if (!hlsRef.current) createHLS();
+			if (!hlsCreated) setHlsCreated(true);
+			
 			// Forward optional startTime to underlying HlsProxy implementation
 			hlsRef.current?.setSource(source, options, startTime);
 		},
-		[createHLS, isHlsSupported]
+		[createHLS, hlsCreated, isHlsSupported]
 	);
 
 	const stopLoad = useCallback(() => {

@@ -9,7 +9,7 @@ import {
 	VideoRef
 } from "react-native-video";
 import { Platform, View } from "react-native";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SubtitleSource, VideoSource, VideoSourceWithoutId } from "../types/media";
 import { HlsProxyConfig, ProxyURLResolverCallback } from "../types/hls";
 import { CNPLogger } from "../utils/logger";
@@ -23,6 +23,7 @@ import { useFullscreen } from "./useFullscreen";
 import { t } from "../libs/localization";
 import { isCustomPlayerError } from "../libs/error";
 import { AudioTrack, PlayerControllerState, PlayerState, QualityLevel } from "../types/player";
+import { isValidTime } from "../utils/helpers";
 
 export type PlayerControllerProps = {
 	/**
@@ -155,7 +156,12 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 	const isMountedRef = useRef(true); // Track if component is mounted
 	const bufferTimeoutRef = useRef<NodeJS.Timeout | number>(undefined); // For buffering debounce
 	const lastPositionRef = useRef<number>(startPosition || 0);
-	const [paused, setPaused] = useState<boolean>(false);
+	const pendingSeekRef = useRef<number | undefined>(undefined);
+	const pendingSeekRetryRef = useRef<NodeJS.Timeout | number>(undefined);
+	const pendingSeekAttemptsRef = useRef<number>(0);
+	const sourceSwitchInFlightRef = useRef<boolean>(false);
+	const blockPositionUpdatesRef = useRef<boolean>(false);
+	const [paused, setPaused] = useState<boolean>(!autoStart);
 	const [rate, setRate] = useState<number>(1.0);
 	const [volume, setVolumeState] = useState<number>(1.0);
 	const [levelId, setLevelId] = useState<number>(-1);
@@ -171,48 +177,76 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 	const { isFullscreen, onFullscreenEnter, onFullscreenExit, requestFullscreen } = useFullscreen({ videoRef, playerViewRef });
 
 	// Source management hooks
-	const { createdSourcesRef, createdSubtitlesRef, addVideoSource, addSubtitleSource, initializeVideos, initializeSubtitles, cleanupSources, initializedVideo } =
-		useSources({
-			videoSources,
-			subtitleSources,
-			lazyLoadSources,
-			proxyURL,
-			videoRef,
-			playerId,
-			proxyResolver,
-			onLazyLoadSource
-		});
+	const {
+		createdSourcesRef,
+		createdSubtitlesRef,
+		addVideoSource,
+		addSubtitleSource,
+		initializeVideos,
+		initializeSubtitles,
+		cleanupSources,
+		initializedVideo,
+		initializedSubtitle
+	} = useSources({
+		videoSources,
+		subtitleSources,
+		lazyLoadSources,
+		proxyURL,
+		videoRef,
+		playerId,
+		proxyResolver,
+		onLazyLoadSource
+	});
+
+	// Lifecycle
+	useEffect(() => {
+		isMountedRef.current = true;
+		CNPLogger.info(`Initializing player controller for playerId: ${playerId}`);
+		CNPLogger.info("Is hls.js supported:", { isHlsSupported: Hls.isSupported() && typeof window !== "undefined" });
+
+		return () => {
+			isMountedRef.current = false;
+			// run cleanup on unmount or playerId change
+			cleanup();
+		};
+		// Run only on mount/unmount or playerId change
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [playerId]);
 
 	// Initialize state and controller methods here
 	useEffect(() => {
-		isMountedRef.current = true;
-
-		// If video is already initialized skip this
-		if (initializedVideo) {
-			CNPLogger.info("Video already initialized, skipping initialization effect.");
-			CNPLogger.info(`Current video sources:'`, videoSources);
-			return;
-		}
-
 		(async () => {
 			try {
-				CNPLogger.info(`Initializing player controller for playerId: ${playerId}`);
-				CNPLogger.info("Is hls.js supported:", { isHlsSupported: Hls.isSupported() && typeof window !== "undefined" });
+				CNPLogger.info("Running player initialization effect with props:", {
+					videos: videoSources.length,
+					subtitles: subtitleSources.length,
+					defaultVideo: initialVideoSource,
+					defaultSubtitle: initialSubtitleSource
+				});
 
-				// Initialize video and subtitle sources
-				controlsRef.current?.setControlState({ type: "loading", message: t("PREPARING") });
+				if (!initializedVideo) {
+					// Initialize video and subtitle sources
+					controlsRef.current?.setControlState({ type: "loading", message: t("PREPARING") });
 
-				await initializeVideos();
-				await initializeSubtitles().then(null); // Video should not wait for subtitles to fail
+					await initializeVideos();
 
-				// Apply initial video index if valid
-				if (initialVideoSource >= 0 && initialVideoSource < videoSources.length) {
-					await setVideoSource(initialVideoSource);
+					// Apply initial video index if valid
+					if (initialVideoSource >= 0 && videoSources.length > 0) {
+						await setVideoSource(initialVideoSource);
+					}
+				} else {
+					CNPLogger.info("Video already initialized, skipping initialization effect.");
 				}
 
-				// Apply initial subtitle index if valid
-				if (initialSubtitleSource >= 0 && initialSubtitleSource < subtitleSources.length) {
-					await setSubtitleSource(initialSubtitleSource);
+				if (!initializedSubtitle) {
+					await initializeSubtitles().then(null); // Video should not wait for subtitles to fail
+
+					// Apply initial subtitle index if valid
+					if (initialSubtitleSource >= 0 && subtitleSources.length > 0) {
+						await setSubtitleSource(initialSubtitleSource);
+					}
+				} else {
+					CNPLogger.info("Subtitles already initialized, skipping initialization effect.");
 				}
 
 				// Apply initial audio track index if valid (deferred until tracks are discovered at onLoad)
@@ -225,15 +259,9 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 			}
 		})();
 
-		return () => {
-			isMountedRef.current = false;
-			// run cleanup on unmount or playerId change
-			cleanup();
-		};
-
 		// Run only on mount/unmount or playerId change
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [playerId]);
+	}, [playerId, videoSources, subtitleSources]);
 
 	// initialVideoSource and initialSubtitleSource are applied in the init effect above because
 	// those lists come from props and are available immediately at mount time.
@@ -247,6 +275,60 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 		// Only fire when the audio track list is first populated
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [audioTracks]);
+
+	const clearPendingSeekRetry = useCallback(() => {
+		if (pendingSeekRetryRef.current) {
+			clearTimeout(pendingSeekRetryRef.current);
+			pendingSeekRetryRef.current = undefined;
+		}
+	}, []);
+
+	const clearPendingSeek = useCallback(() => {
+		pendingSeekRef.current = undefined;
+		pendingSeekAttemptsRef.current = 0;
+		clearPendingSeekRetry();
+	}, [clearPendingSeekRetry]);
+
+	const applyPendingSeek = useCallback(() => {
+		if (!isMountedRef.current || !videoRef.current) return;
+
+		const seekTime = pendingSeekRef.current;
+		if (!isValidTime(seekTime)) {
+			clearPendingSeek();
+			return;
+		}
+
+		try {
+			// On web, the HTMLVideoElement may not be ready immediately after source change, even if the React ref is set.
+			if (Platform.OS === "web" && videoRef.current.nativeHtmlVideoRef?.current) {
+				const htmlVideo = videoRef.current.nativeHtmlVideoRef.current;
+				if (htmlVideo.readyState < 1) {
+					if (pendingSeekAttemptsRef.current < 15) {
+						pendingSeekAttemptsRef.current += 1;
+						clearPendingSeekRetry();
+						pendingSeekRetryRef.current = setTimeout(applyPendingSeek, 120);
+					}
+					return;
+				}
+			}
+
+			// If we have a valid seek time, apply it now that the media is ready. This handles the common case of preserving
+			videoRef.current.seek(seekTime);
+			lastPositionRef.current = seekTime;
+			CNPLogger.info("Applied pending seek after source change:", seekTime);
+			clearPendingSeek();
+		} catch (error) {
+			if (pendingSeekAttemptsRef.current < 15) {
+				pendingSeekAttemptsRef.current += 1;
+				clearPendingSeekRetry();
+				pendingSeekRetryRef.current = setTimeout(applyPendingSeek, 120);
+				return;
+			}
+
+			CNPLogger.warn("Unable to apply pending seek after source change:", { seekTime, error });
+			clearPendingSeek();
+		}
+	}, [videoRef, clearPendingSeek, clearPendingSeekRetry]);
 
 	/****************/
 	/****************/
@@ -286,12 +368,21 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 					message: stateMessage
 				});
 		}
+
+		// If a source switch is in-flight and errors, keep the last known good
+		// playback position intact (don't allow the failed load to overwrite it).
+		if (sourceSwitchInFlightRef.current) {
+			blockPositionUpdatesRef.current = true;
+			sourceSwitchInFlightRef.current = false;
+		}
 	}, []);
 
 	const onBuffer = useCallback(
 		(data: OnBufferData) => {
+			CNPLogger.info("Buffering state changed:", data.isBuffering);
 			// If not sources is set or selected should ignore settign this to loading or idle state
 			if (sourceId === -1 || videoSources.length < 1) return;
+
 			const isBuffering = data.isBuffering;
 			if (!isBuffering && bufferTimeoutRef.current) clearTimeout(bufferTimeoutRef.current);
 
@@ -354,8 +445,13 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 
 			// Filter levels by maxResolutionHeight and update state
 			const filteredLevels = (levels || []).filter((l) => (typeof l.height === "number" ? l.height : 0) <= maxResolutionHeight);
-			setLevels(filteredLevels);
+			// If filtering results in an empty list, fallback to original levels to avoid leaving user with no options
+			setLevels(filteredLevels.length == 0 ? levels : filteredLevels);
 			CNPLogger.info("Available quality levels:", filteredLevels);
+			CNPLogger.info(
+				"Selected quality level:",
+				filteredLevels.find((l) => l.id === levelId)
+			);
 
 			// Detect live streams
 			let detectedLive = false;
@@ -398,20 +494,30 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 			// Controller onload callback
 			if (data) controlsRef.current?.onLoad(data);
 
-			// Check auto start
-			if (autoStart) {
-				videoRef.current?.resume();
-				CNPLogger.info("Video auto-starting playback.");
-			}
+			// Clear loading state defensively after load if idle
+			controlsRef.current?.setControlState({ type: "idle", message: "" });
+
+			// Seek to preserved time after media metadata is ready.
+			applyPendingSeek();
+
+			// A successful load means the switch finished; allow progress to update position again.
+			sourceSwitchInFlightRef.current = false;
+			blockPositionUpdatesRef.current = false;
 		},
-		[autoStart]
+		[maxResolutionHeight, applyPendingSeek]
 	);
 
-	const onPlaybackStateChanged = useCallback((data: OnPlaybackStateChangedData) => {
-		setPaused(!data.isPlaying);
-		// Clear any control states when playback resumes
-		if (data.isPlaying && controlsRef.current?.state.type !== "idle") controlsRef.current?.setControlState({ type: "idle", message: "" });
-	}, []);
+	const onPlaybackStateChanged = useCallback(
+		(data: OnPlaybackStateChangedData) => {
+			CNPLogger.info("Playback state changed:", data);
+			setPaused(!data.isPlaying);
+			// Clear any control states when playback resumes
+			// There is an wierd issue where it shows that video is playing but its not
+			if (data.isPlaying && videoSources.length > 0 && controlsRef.current?.state.type !== "idle")
+				controlsRef.current?.setControlState({ type: "idle", message: "" });
+		},
+		[videoSources]
+	);
 
 	/****************/
 	/****************/
@@ -422,9 +528,10 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 
 	const onHLSLevelSwitched = useCallback((_: string, data: LevelSwitchedData) => {
 		CNPLogger.info("Switched to quality:", data.level);
-		if (isMountedRef.current) {
-			setLevelId(data.level);
-		}
+		// if (isMountedRef.current) {
+		// 	setLevelId(data.level);
+		// }
+		// Disabling is to manual switch to allow auto level
 	}, []);
 
 	// Fired by HLS.js when the audio track actually switches — keep audioId in sync
@@ -442,7 +549,7 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 		createHLS,
 		setSource: hlsSetSource,
 		stopLoad: hlsStopLoad,
-		runDestroy
+		runDestroy: destroyHls
 	} = useHlsProxy({
 		hlsConfig,
 		videoRef,
@@ -459,6 +566,7 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 
 	const cleanup = useCallback(() => {
 		// Video Element cleanup
+		clearPendingSeek();
 		stopLoadSource();
 		setSourceId(-1);
 		setSubtitleId(-1);
@@ -470,7 +578,7 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 		setIsLive(false);
 
 		// HLS Proxy cleanup
-		runDestroy();
+		destroyHls();
 
 		// Video track cleanup (remove <track> elements, not TextTrack objects)
 		if (Platform.OS === "web" && videoRef.current?.nativeHtmlVideoRef?.current) {
@@ -483,7 +591,7 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 
 		// Clear created sources and subtitles
 		cleanupSources();
-	}, [playerId, stopLoadSource, runDestroy, cleanupSources]);
+	}, [playerId, stopLoadSource, destroyHls, cleanupSources, clearPendingSeek]);
 
 	/****************/
 	/****************/
@@ -499,14 +607,20 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 		setNativeVideoProps((prev) => ({
 			...prev,
 			...(hlsCreated
-				? {}
+				? {
+						source: {
+							...prev?.source,
+							uri: undefined, // Clear the native source URI to avoid overwriting HLS Blob
+							headers: {}
+						}
+					}
 				: {
 						source: {
 							...prev?.source,
 							uri: videoSource?.source,
 							headers: (videoSource?.options?.nativeSendHeadersOnSourceRequest && videoSource?.options?.headers) || {}
 						}
-					}), // No special props needed when HLS is used
+					}), // Clear source props if HLS handles it
 			selectedTextTrack: subtitleSource
 				? {
 						type: SelectedTrackType.INDEX,
@@ -520,6 +634,7 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 
 	const setVideoSource = useCallback(
 		async (sourceIndex: number) => {
+			let startedSwitch = false;
 			try {
 				const video = videoSources[sourceIndex];
 				if (!video) return CNPLogger.warn(`Video source at index ${sourceIndex} not found.`);
@@ -535,24 +650,38 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 				if (!createdSource) return CNPLogger.warn(`Created video source for id ${video.id} not found.`);
 
 				// Capture current playback time (for preserve playback behavior)
-				const currentPos = lastPositionRef.current || 0;
-				const startTime = preservePlaybackOnSourceChange ? currentPos : startPosition;
+				const currentPos = isValidTime(lastPositionRef.current) ? lastPositionRef.current : 0;
+				CNPLogger.info("Current playback position before source switch:", currentPos);
+				const requestedStartTime = preservePlaybackOnSourceChange ? currentPos : startPosition;
+				const startTime = isValidTime(requestedStartTime) ? requestedStartTime : 0;
+				pendingSeekRef.current = startTime;
+				pendingSeekAttemptsRef.current = 0;
+				clearPendingSeekRetry();
+
+				// Lock playback position updates while we attempt to switch sources.
+				// If the attempted source is invalid and emits progress=0, we don't want
+				// to overwrite the preserved time.
+				blockPositionUpdatesRef.current = true;
+				sourceSwitchInFlightRef.current = true;
+				startedSwitch = true;
 
 				// Stop current source playback if needed
 				stopLoadSource();
 
 				// If format is HLS and supported, use HlsProxy to set source
 				if (isHlsSupported && video.format === "m3u8") {
-					CNPLogger.info("HLS Proxy initializing....");
 					controlsRef.current?.setControlState({ type: "loading", message: t("PREPARING") });
 					if (!hlsCreated) createHLS();
-					videoRef.current?.setSource({ uri: undefined }); // Clear native source
 					hlsSetSource(createdSource.source, createdSource.options, startTime);
 					CNPLogger.info("HLS Proxy source set:", { uri: createdSource.source, options: createdSource.options, startTime });
 				} else {
+					// Destroying the hls instance if it exists to ensure a clean state before setting the new source on the native player
+					if (hlsCreated) {
+						destroyHls();
+						CNPLogger.info("Destroyed existing HLS instance to set new source on native player.");
+					}
+
 					if (!videoRef.current) return CNPLogger.warn("Video reference is not available.");
-					// If hls is supported make sure to clear destroy previous source
-					if (isHlsSupported) runDestroy();
 
 					// Set source on native video player
 					videoRef.current.setSource({
@@ -565,13 +694,35 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 				// Start playback if not lazy loading
 				setSourceId(video.id);
 			} catch (error) {
+				// If we failed before a real switch attempt started, keep progress updates flowing.
+				if (!startedSwitch) {
+					blockPositionUpdatesRef.current = false;
+					sourceSwitchInFlightRef.current = false;
+					clearPendingSeek();
+				} else {
+					// If we already started switching and it failed, keep the lock until next successful load.
+					sourceSwitchInFlightRef.current = false;
+				}
 				CNPLogger.warn(`Failed to set video source at index ${sourceIndex}:`, error);
 				// Show error on controls
 				if (isCustomPlayerError(error)) controlsRef.current?.setControlState({ type: "error", message: error.stateMessage() });
 				else controlsRef.current?.setControlState({ type: "error", message: t("CHANGING_SOURCE_ERROR") });
 			}
 		},
-		[sourceId, videoSources, hlsCreated, addVideoSource, stopLoadSource, hlsSetSource, runDestroy, createHLS, preservePlaybackOnSourceChange, startPosition]
+		[
+			sourceId,
+			videoSources,
+			hlsCreated,
+			addVideoSource,
+			stopLoadSource,
+			hlsSetSource,
+			destroyHls,
+			createHLS,
+			preservePlaybackOnSourceChange,
+			startPosition,
+			clearPendingSeek,
+			clearPendingSeekRetry
+		]
 	);
 
 	const setSubtitleSource = useCallback(
@@ -706,8 +857,6 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 	}, []);
 
 	const setPause = useCallback((paused: boolean) => {
-		if (paused) videoRef.current?.pause();
-		else videoRef.current?.resume();
 		setPaused(paused);
 	}, []);
 
@@ -741,7 +890,13 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 			onPlaybackStateChanged,
 			onLoad: onLoadMetadata,
 			onProgress: (e) => {
-				lastPositionRef.current = e.currentTime;
+				if (!blockPositionUpdatesRef.current && typeof e.currentTime === "number" && isFinite(e.currentTime)) {
+					lastPositionRef.current = e.currentTime;
+				}
+
+				if (pendingSeekRef.current !== undefined && isValidTime(pendingSeekRef.current)) {
+					applyPendingSeek();
+				}
 				controlsRef.current?.onProgress(e);
 			},
 			onPlaybackRateChange: ({ playbackRate }) => {

@@ -70,9 +70,10 @@ export class HlsProxy extends Hls implements Omit<IHlsProxyManager, "resolveURL"
 		if (options?.overrideProxyURL) this.setProxyTunnelURL(options.overrideProxyURL);
 		this.setProxyTunnelHeaders(options?.headers || {});
 		this.loadSource(url);
-		// If a startTime is provided forward it to startLoad so HLS begins at that position
-		// startLoad accepts a number (seconds) or -1 to start from the beginning
-		this.startLoad(typeof startTime === "number" ? startTime : -1);
+		// If a startTime is provided forward it to startLoad so HLS begins at that position.
+		// Guard non-finite values to avoid invalid currentTime writes in HTMLMediaElement.
+		const safeStartTime = typeof startTime === "number" && Number.isFinite(startTime) && !Number.isNaN(startTime) && startTime >= 0 ? startTime : -1;
+		this.startLoad(safeStartTime);
 	}
 
 	runDestroy() {

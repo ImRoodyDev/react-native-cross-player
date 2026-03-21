@@ -100,8 +100,8 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 			setSubtitle: (index: number) => controls.setSubtitle(index),
 			setVideoSource: (index: number) => controls.setSource(index),
 			seek: (time: number) => videoRef.current?.seek(time),
-			play: () => videoRef.current?.resume(),
-			pause: () => videoRef.current?.pause(),
+			play: () => controls.setPause(false),
+			pause: () => controls.setPause(true),
 			getCurrentVideoIndex: () => playerState.sourceIndex,
 			getCurrentSubtitleIndex: () => playerState.subtitleIndex
 		}),
@@ -114,7 +114,6 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 
 			<Video
 				ref={videoRef}
-				paused={!props.playerConfig.autoStart}
 				focusable={false}
 				controls={false}
 				disableDisconnectError={false}
@@ -122,6 +121,7 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 				style={[{ width: "100%", height: "auto", margin: "auto" }, videoStyle]}
 				resizeMode={"contain"}
 				{...nativeVideoProps}
+				paused={playerState.paused}
 			/>
 
 			<PlayerControls

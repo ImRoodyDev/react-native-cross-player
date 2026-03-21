@@ -75,4 +75,8 @@ export function formatTime(totalSeconds = 0): string {
 }
 
 /** Sanitize error or log message by removing escaped quotes, extra spaces, and trimming */
-export const sanitizeMessage = (value: string): string => value.replace(/\\"/g, '"').replace(/"/g, '').replace(/\s+/g, ' ').trim();
+export const sanitizeMessage = (value: string): string => value.replace(/\\"/g, '"').replace(/"/g, "").replace(/\s+/g, " ").trim();
+
+export function isValidTime(value: unknown): value is number {
+	return typeof value === "number" && Number.isFinite(value) && !Number.isNaN(value) && value >= 0;
+}

@@ -5,6 +5,7 @@ import { createM3U8Source, createVTTSource } from "../libs/media";
 import { clearBlobGroup } from "../libs/blob";
 import React, { useCallback, useRef } from "react";
 import { VideoRef } from "react-native-video";
+import { CNPLogger } from "../utils/logger";
 
 export type UseSourcesParams = {
 	videoSources?: VideoSource[];
@@ -33,9 +34,11 @@ export function useSources(params: UseSourcesParams) {
 				...(onLazyLoadSource ? (await onLazyLoadSource(video)) || {} : {})
 			};
 
+			// If the source was updated by the callback, use the updated source for proxy resolution and blob URL creation
 			if (updatedVideo.options && !updatedVideo.options.overrideProxyURL) updatedVideo.options.overrideProxyURL = proxyURL;
 
-			if (updatedVideo.format === "m3u8" && Platform.OS !== "web") {
+			// Create m3u8 source for non-web platforms, otherwise resolve proxy if needed
+			if (updatedVideo.format === "m3u8" && Platform.OS !== "web" && updatedVideo.options?.useProxy) {
 				updatedVideo.source = await createM3U8Source(updatedVideo, proxyResolver).catch(() => "");
 			} else {
 				if (proxyResolver && updatedVideo.options?.useProxy)
@@ -74,6 +77,11 @@ export function useSources(params: UseSourcesParams) {
 	);
 
 	const initializeVideos = useCallback(async () => {
+		if (videoSources.length === 0) {
+			CNPLogger.info("No video sources provided, skipping video initialization.");
+			setInitializedVideo(false);
+			return;
+		}
 		if (!lazyLoadSources) {
 			for (const video of videoSources) await addVideoSource(video);
 		}
@@ -81,6 +89,11 @@ export function useSources(params: UseSourcesParams) {
 	}, [videoSources, lazyLoadSources, addVideoSource]);
 
 	const initializeSubtitles = useCallback(async () => {
+		if (subtitleSources.length === 0) {
+			CNPLogger.info("No subtitle sources provided, skipping subtitle initialization.");
+			setInitializedSubtitle(false);
+			return;
+		}
 		if (!lazyLoadSources) {
 			for (const subtitle of subtitleSources) await addSubtitleSource(subtitle);
 		}

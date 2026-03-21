@@ -35,5 +35,7 @@ yarn-error.*
 
 # Test generated files
 __tests__/CNP_Cache/*
+*/CNP_Cache/*
+docs/*
 
 # @end expo-cli

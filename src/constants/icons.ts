@@ -320,33 +320,75 @@ const icons = {
 			)
 		),
 
-		audio_wave: (props: IconProps) =>
+	audio_wave: (props: IconProps) =>
+		React.createElement(
+			View,
+			{
+				className: props.className
+			},
 			React.createElement(
-				View,
+				Svg,
 				{
-					className: props.className
+					width: props.size || 24,
+					height: props.size || 24,
+					viewBox: props.viewBox || "0 0 24 24",
+					fill: "none",
+					stroke: props.color || "currentColor",
+					strokeWidth: 2,
+					strokeLinecap: "round",
+					strokeLinejoin: "round",
+					className: props.className,
+					style: props.style
 				},
-				React.createElement(
-					Svg,
-					{
-						width: props.size || 24,
-						height: props.size || 24,
-						viewBox: props.viewBox || "0 0 24 24",
-						fill: "none",
-						stroke: props.color || "currentColor",
-						strokeWidth: 2,
-						strokeLinecap: "round",
-						strokeLinejoin: "round",
-						className: props.className,
-						style: props.style
-					},
-					React.createElement(Path, { d: "M2 10v3", stroke: props.color || "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", fill: "none" }),
-					React.createElement(Path, { d: "M6 6v11", stroke: props.color || "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", fill: "none" }),
-					React.createElement(Path, { d: "M10 3v18", stroke: props.color || "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", fill: "none" }),
-					React.createElement(Path, { d: "M14 8v7", stroke: props.color || "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", fill: "none" }),
-					React.createElement(Path, { d: "M18 5v13", stroke: props.color || "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", fill: "none" }),
-					React.createElement(Path, { d: "M22 10v3", stroke: props.color || "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", fill: "none" })
-				)
+				React.createElement(Path, {
+					d: "M2 10v3",
+					stroke: props.color || "currentColor",
+					strokeWidth: 2,
+					strokeLinecap: "round",
+					strokeLinejoin: "round",
+					fill: "none"
+				}),
+				React.createElement(Path, {
+					d: "M6 6v11",
+					stroke: props.color || "currentColor",
+					strokeWidth: 2,
+					strokeLinecap: "round",
+					strokeLinejoin: "round",
+					fill: "none"
+				}),
+				React.createElement(Path, {
+					d: "M10 3v18",
+					stroke: props.color || "currentColor",
+					strokeWidth: 2,
+					strokeLinecap: "round",
+					strokeLinejoin: "round",
+					fill: "none"
+				}),
+				React.createElement(Path, {
+					d: "M14 8v7",
+					stroke: props.color || "currentColor",
+					strokeWidth: 2,
+					strokeLinecap: "round",
+					strokeLinejoin: "round",
+					fill: "none"
+				}),
+				React.createElement(Path, {
+					d: "M18 5v13",
+					stroke: props.color || "currentColor",
+					strokeWidth: 2,
+					strokeLinecap: "round",
+					strokeLinejoin: "round",
+					fill: "none"
+				}),
+				React.createElement(Path, {
+					d: "M22 10v3",
+					stroke: props.color || "currentColor",
+					strokeWidth: 2,
+					strokeLinecap: "round",
+					strokeLinejoin: "round",
+					fill: "none"
+				})
+			)
 		),
 	volume_slash: (props: IconProps) =>
 		React.createElement(
@@ -648,6 +690,31 @@ const icons = {
 				},
 				React.createElement(Path, {
 					d: "M5.5 0a.5.5 0 0 1 .5.5v4A1.5 1.5 0 0 1 4.5 6h-4a.5.5 0 0 1 0-1h4a.5.5 0 0 0 .5-.5v-4a.5.5 0 0 1 .5-.5m5 0a.5.5 0 0 1 .5.5v4a.5.5 0 0 0 .5.5h4a.5.5 0 0 1 0 1h-4A1.5 1.5 0 0 1 10 4.5v-4a.5.5 0 0 1 .5-.5M0 10.5a.5.5 0 0 1 .5-.5h4A1.5 1.5 0 0 1 6 11.5v4a.5.5 0 0 1-1 0v-4a.5.5 0 0 0-.5-.5h-4a.5.5 0 0 1-.5-.5m10 1a1.5 1.5 0 0 1 1.5-1.5h4a.5.5 0 0 1 0 1h-4a.5.5 0 0 0-.5.5v4a.5.5 0 0 1-1 0z"
+				})
+			)
+		),
+	speed: (props: IconProps) =>
+		React.createElement(
+			View,
+			{
+				className: props.className
+			},
+			React.createElement(
+				Svg,
+				{
+					width: props.size || 16,
+					height: props.size || 16,
+					viewBox: "0 0 16 16",
+					fill: props.color || "currentColor",
+					className: props.className,
+					style: props.style
+				},
+				React.createElement(Path, {
+					d: "M8 2a.5.5 0 0 1 .5.5V4a.5.5 0 0 1-1 0V2.5A.5.5 0 0 1 8 2M3.732 3.732a.5.5 0 0 1 .707 0l.915.914a.5.5 0 1 1-.708.708l-.914-.915a.5.5 0 0 1 0-.707M2 8a.5.5 0 0 1 .5-.5h1.586a.5.5 0 0 1 0 1H2.5A.5.5 0 0 1 2 8m9.5 0a.5.5 0 0 1 .5-.5h1.5a.5.5 0 0 1 0 1H12a.5.5 0 0 1-.5-.5m.754-4.246a.39.39 0 0 0-.527-.02L7.547 7.31A.91.91 0 1 0 8.85 8.569l3.434-4.297a.39.39 0 0 0-.029-.518z"
+				}),
+				React.createElement(Path, {
+					fillRule: "evenodd",
+					d: "M6.664 15.889A8 8 0 1 1 9.336.11a8 8 0 0 1-2.672 15.78zm-4.665-4.283A11.95 11.95 0 0 1 8 10c2.186 0 4.236.585 6.001 1.606a7 7 0 1 0-12.002 0"
 				})
 			)
 		)

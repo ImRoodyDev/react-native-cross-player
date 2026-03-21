@@ -257,6 +257,17 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 							afterSelect={closeDropdown}
 							getItemText={(i) => i.name}
 						/>
+
+						<PlayerDropdown
+							open={triggeredDropdown == 4}
+							title={t("PLAYBACK_RATE")}
+							defaultValue={props.playerState.rate}
+							items={props.resources.rates}
+							onSelect={(rate) => props.controls.setPlaybackRate(rate)}
+							afterSelect={closeDropdown}
+							getItemText={(rate) => `${String(rate).replace(/\.0$/, "")}x`}
+						/>
+
 						{/* Audio track selector — only rendered when the media has multiple audio tracks */}
 						<PlayerDropdown
 							open={triggeredDropdown == 3}
@@ -378,6 +389,21 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 					<TimeDisplayer currentTime={playerCurrentTime} fullTime={playerDurationTime} />
 
 					<View className={"player-buttons-separator"} />
+
+					<Button
+						onPress={() => openDropdown(4)}
+						icon="speed"
+						className={`player-button only-landscape`}
+						iconSize={defaultIconSize - 4}
+						borderRadius={999999}
+						textColor="white"
+						focusedTextColor="white"
+						pressedScale={0.9}
+						backgroundColor={"transparent"}
+						selectedBackgroundColor={zinc[700]}
+						pressedBackgroundColor={zinc[600]}
+						{...((props.resources.rates.length < 1 || props.playerState.isLive) && { style: { display: "none" } })}
+					/>
 
 					<Button
 						onPress={() => openDropdown(0)}

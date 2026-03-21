@@ -1,4 +1,4 @@
-import React, { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import React, { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { FlatList as RNFlatList } from "react-native";
 import { useResponsiveSize } from "../hooks/useResponsiveSize";
@@ -6,15 +6,24 @@ import Button from "./Button";
 import { zinc } from "tailwindcss/colors";
 import { View, Text, AnimatedView, FlatList } from "./styled";
 
-type Props<T> = {
+type BaseProps<T> = {
 	open?: boolean;
 	title: string;
 	items: T[];
 	onSelect: (item: T, index: number) => void;
 	afterSelect?: () => void;
 	getItemText: (item: T) => string;
-	defaultSelected: number;
 };
+
+type Props<T> =
+	| (BaseProps<T> & {
+			defaultSelected: number;
+			defaultValue?: never;
+	  })
+	| (BaseProps<T> & {
+			defaultSelected?: never;
+			defaultValue: T;
+	  });
 
 export type DropdownRef = {
 	toggle: () => void;
@@ -23,10 +32,7 @@ export type DropdownRef = {
 	isDropdownOpen: () => boolean;
 };
 
-function PlayerDropdown<T>(
-	{ title, open, items, onSelect, getItemText, defaultSelected, afterSelect }: Props<T>,
-	ref?: React.Ref<DropdownRef>
-) {
+function PlayerDropdown<T>({ title, open, items, onSelect, getItemText, afterSelect, ...rest }: Props<T>, ref?: React.Ref<DropdownRef>) {
 	const sizes = useResponsiveSize();
 	const maxHeight = sizes.h2 * 5 + sizes.h1;
 
@@ -35,13 +41,26 @@ function PlayerDropdown<T>(
 	const height = useSharedValue(0);
 	const opacity = useSharedValue(0);
 
-	const [selectedIndex, setSelectedIndex] = useState<number>(defaultSelected);
+	const resolvedDefaultIndex = useMemo(() => {
+		if ("defaultSelected" in rest && typeof rest.defaultSelected === "number") {
+			return rest.defaultSelected;
+		}
+
+		if ("defaultValue" in rest) {
+			const idx = items.findIndex((i) => Object.is(i, rest.defaultValue));
+			return idx >= 0 ? idx : 0;
+		}
+
+		return 0;
+	}, [items, rest]);
+
+	const [selectedIndex, setSelectedIndex] = useState<number>(resolvedDefaultIndex);
 	const [isDropdownOpen, setDropdownOpen] = useState(open ?? false);
 
-	// Track changes to defaultSelected prop
+	// Track changes to selection inputs
 	useEffect(() => {
-		setSelectedIndex(defaultSelected);
-	}, [defaultSelected]);
+		setSelectedIndex(resolvedDefaultIndex);
+	}, [resolvedDefaultIndex]);
 
 	// Track changes to open prop
 	useEffect(() => {
@@ -168,7 +187,7 @@ function PlayerDropdown<T>(
 				contentContainerClassName={"player-dropdown-items"}
 				ref={flatListRef}
 				data={items}
-				keyExtractor={(_: T, i: number) => (i == defaultSelected ? i.toString() + "_selected" : i.toString())}
+				keyExtractor={(_: T, i: number) => i.toString()}
 				renderItem={renderItem}
 				scrollEnabled={isDropdownOpen}
 				aria-disabled={isDropdownOpen}
