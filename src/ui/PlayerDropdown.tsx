@@ -37,7 +37,7 @@ function PlayerDropdown<T>({ title, open, items, onSelect, getItemText, afterSel
 	const maxHeight = sizes.h2 * 5 + sizes.h1;
 
 	const flatListRef = useRef<RNFlatList<T>>(null);
-	const timeoutRef = useRef<NodeJS.Timeout | number | null>(null);
+	const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const height = useSharedValue(0);
 	const opacity = useSharedValue(0);
 

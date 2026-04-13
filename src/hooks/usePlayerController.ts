@@ -154,10 +154,10 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 
 	// States and refs
 	const isMountedRef = useRef(true); // Track if component is mounted
-	const bufferTimeoutRef = useRef<NodeJS.Timeout | number>(undefined); // For buffering debounce
+	const bufferTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined); // For buffering debounce
 	const lastPositionRef = useRef<number>(startPosition || 0);
 	const pendingSeekRef = useRef<number | undefined>(undefined);
-	const pendingSeekRetryRef = useRef<NodeJS.Timeout | number>(undefined);
+	const pendingSeekRetryRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 	const pendingSeekAttemptsRef = useRef<number>(0);
 	const sourceSwitchInFlightRef = useRef<boolean>(false);
 	const blockPositionUpdatesRef = useRef<boolean>(false);

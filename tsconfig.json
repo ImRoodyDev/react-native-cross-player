@@ -5,7 +5,7 @@
 		"lib": ["esnext", "dom"],
 		"module": "esnext",
 		"target": "esnext",
-		"moduleResolution": "node",
+		"moduleResolution": "bundler",
 
 		"esModuleInterop": true,
 		"resolvePackageJsonImports": false,

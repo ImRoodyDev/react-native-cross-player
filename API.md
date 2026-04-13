@@ -165,6 +165,31 @@ See `src/hooks/usePlayerController.ts` for full typings and runtime options. Key
     <td><code>() =&gt; void</code></td>
     <td>Called when the next-video action is pressed.</td>
   </tr>
+  <tr>
+    <td><code>onSourceChange?</code></td>
+    <td><code>(index: number, source: VideoSource) =&gt; void</code></td>
+    <td>Called when the active video source changes.</td>
+  </tr>
+  <tr>
+    <td><code>onSubtitleChange?</code></td>
+    <td><code>(index: number, subtitle: SubtitleSource) =&gt; void</code></td>
+    <td>Called when a subtitle track becomes active.</td>
+  </tr>
+  <tr>
+    <td><code>onPlaybackChange?</code></td>
+    <td><code>(isPlaying: boolean) =&gt; void</code></td>
+    <td>Called when playback toggles between playing and paused.</td>
+  </tr>
+  <tr>
+    <td><code>onProgress?</code></td>
+    <td><code>(currentTime: number) =&gt; void</code></td>
+    <td>Called on each progress update with the current playback time in seconds.</td>
+  </tr>
+  <tr>
+    <td><code>onEnd?</code></td>
+    <td><code>() =&gt; void</code></td>
+    <td>Called when the active media finishes playback.</td>
+  </tr>
 </tbody>
 </table>
 

@@ -1,8 +1,8 @@
 "use client";
 
-import React, { forwardRef, useEffect, useImperativeHandle } from "react";
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle } from "react";
 import { StatusBar, StyleProp, View as RNView, ViewStyle } from "react-native";
-import Video, { VideoRef } from "react-native-video";
+import Video, { OnProgressData, ReactVideoProps, VideoRef } from "react-native-video";
 import PlayerControls, { PlayerControlsRef } from "./PlayerControls";
 import { PlayerControllerProps, usePlayerController } from "../hooks/usePlayerController";
 import { Languages, setLanguage } from "../libs/localization";
@@ -27,6 +27,8 @@ export type VideoPlayerProps = {
 	onSourceChange?: (index: number, source: VideoSource) => void;
 	onSubtitleChange?: (index: number, subtitle: SubtitleSource) => void;
 	onPlaybackChange?: (isPlaying: boolean) => void;
+	onProgress?: (currentTime: number) => void;
+	onEnd?: () => void;
 };
 
 export type VideoPlayerRef = {
@@ -55,7 +57,9 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 		onControlVisibilityChange,
 		onSourceChange,
 		onSubtitleChange,
-		onPlaybackChange
+		onPlaybackChange,
+		onProgress,
+		onEnd
 	} = props;
 	const videoRef = React.useRef<VideoRef>(null);
 	const controlsRef = React.useRef<PlayerControlsRef>(null);
@@ -69,6 +73,18 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 		playerViewRef,
 		...playerConfig
 	});
+
+	const videoProps: ReactVideoProps = {
+		...(nativeVideoProps || {}),
+		onProgress: (event: OnProgressData) => {
+			nativeVideoProps?.onProgress?.(event);
+			onProgress?.(event.currentTime);
+		},
+		onEnd: () => {
+			nativeVideoProps?.onEnd?.();
+			onEnd?.();
+		}
+	};
 
 	// Callbacks for source and subtitle changes
 	useEffect(() => {
@@ -108,8 +124,12 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 		[controls, playerState.sourceIndex, playerState.subtitleIndex]
 	);
 
+	const handlePointerActivity = useCallback(() => {
+		controlsRef.current?.showControls();
+	}, []);
+
 	return (
-		<View id={"video-player"} className={clsx("video-player", controlsVisible && "video-controls-on")} ref={playerViewRef} style={viewStyle}>
+		<View id={"video-player"} className={clsx("video-player", controlsVisible && "video-controls-on")} ref={playerViewRef} style={viewStyle} onPointerMove={handlePointerActivity} onTouchStart={handlePointerActivity}>
 			<StatusBar hidden={playerState.isFullscreen} />
 
 			<Video
@@ -120,7 +140,7 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 				preventsDisplaySleepDuringVideoPlayback={false}
 				style={[{ width: "100%", height: "auto", margin: "auto" }, videoStyle]}
 				resizeMode={"contain"}
-				{...nativeVideoProps}
+				{...videoProps}
 				paused={playerState.paused}
 			/>
 

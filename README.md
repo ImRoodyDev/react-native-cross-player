@@ -199,6 +199,20 @@ import { usePlayerController } from "react-native-cross-player";
     <td>No</td>
     <td>Called when playback toggles between playing and paused after the player has mounted.</td>
   </tr>
+  <tr>
+    <td><code>onProgress</code></td>
+    <td><code>(currentTime: number) =&gt; void</code></td>
+    <td>—</td>
+    <td>No</td>
+    <td>Called on each native progress update with the current playback time in seconds.</td>
+  </tr>
+  <tr>
+    <td><code>onEnd</code></td>
+    <td><code>() =&gt; void</code></td>
+    <td>—</td>
+    <td>No</td>
+    <td>Called when playback reaches the end of the active media.</td>
+  </tr>
 </tbody>
 </table>
 
@@ -232,6 +246,12 @@ You can observe source and subtitle switches from the built-in UI or imperative 
 	}}
 	onPlaybackChange={(isPlaying) => {
 		console.log("Playback changed", isPlaying ? "playing" : "paused");
+	}}
+	onProgress={(currentTime) => {
+		console.log("Current time", currentTime);
+	}}
+	onEnd={() => {
+		console.log("Playback finished");
 	}}
 />
 ```

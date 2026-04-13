@@ -38,6 +38,7 @@ export type PlayerControlsRef = {
 	onLoad: (event: OnLoadData) => void;
 	onProgress: (event: OnProgressData) => void;
 	setControlState: (action: Action) => void;
+	showControls: () => void;
 	state: Readonly<State>;
 };
 
@@ -51,7 +52,7 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 	const defaultIconSize = sizes.h5;
 
 	// Timeout reference for control visibility
-	const visibilityTimeoutRef = useRef<NodeJS.Timeout | number>(undefined);
+	const visibilityTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 	const playerCurrentTime = useSharedValue(0);
 	const playerDurationTime = useSharedValue(0);
 	const playerMinDuration = useSharedValue(0);
@@ -165,9 +166,10 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 			},
 			setControlState: (action: Action) => {
 				dispatch(action);
-			}
+			},
+			showControls: showControls
 		}),
-		[state]
+		[state, showControls]
 	);
 
 	// Map Web keyboard events
