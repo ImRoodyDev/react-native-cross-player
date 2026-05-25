@@ -64,12 +64,10 @@
 		"registry": "https://registry.npmjs.org/"
 	},
 	"dependencies": {
-		"@types/node": "^25.1.0",
 		"clsx": "^2.1.1",
 		"hls.js": "^1.6.15",
 		"m3u8-parser": "^7.2.0",
-		"p-limit": "^7.0.0",
-		"react-native-cross-elements": "file:../native-cross-elements/react-native-cross-elements-1.0.0.tgz"
+		"p-limit": "^7.0.0"
 	},
 	"peerDependencies": {
 		"nativewind": ">=4",
@@ -77,6 +75,7 @@
 		"react-native": "*",
 		"react-native-awesome-slider": ">=2",
 		"react-native-blob-util": "^0.24.6",
+		"react-native-cross-elements": "file:../native-cross-elements/workspaces/package/react-native-cross-elements-1.0.0.tgz",
 		"react-native-gesture-handler": ">=2",
 		"react-native-orientation-locker": ">=1.5.0",
 		"react-native-reanimated": ">=3",
@@ -93,6 +92,7 @@
 		}
 	},
 	"devDependencies": {
+		"@types/node": "^25.1.0",
 		"@types/jest": "^30.0.0",
 		"@types/m3u8-parser": "^7.2.6",
 		"@types/react": "19.2.2",
@@ -100,6 +100,7 @@
 		"react": "19.2.3",
 		"react-native": "0.83.1",
 		"react-native-builder-bob": "^0.40.17",
+		"react-native-cross-elements": "file:../native-cross-elements/workspaces/package/react-native-cross-elements-1.0.0.tgz",
 		"rimraf": "^5.0.10",
 		"typescript": "5.8.3"
 	},
