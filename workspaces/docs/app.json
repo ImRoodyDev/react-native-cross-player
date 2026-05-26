@@ -1,0 +1,31 @@
+{
+	"expo": {
+		"name": "react-native-cross-player",
+		"slug": "rn-cross-player-docs",
+		"version": "1.0.0",
+		"scheme": "crossplayerdocs",
+		"userInterfaceStyle": "automatic",
+		"newArchEnabled": true,
+		"platforms": ["ios", "android", "web"],
+		"ios": {
+			"supportsTablet": true
+		},
+		"android": {
+			"adaptiveIcon": {
+				"backgroundColor": "#08111f"
+			},
+			"edgeToEdgeEnabled": true
+		},
+		"web": {
+			"bundler": "metro",
+			"output": "static"
+		},
+		"plugins": ["expo-router"],
+		"experiments": {
+			"typedRoutes": true,
+			"baseUrl": "/react-native-cross-player",
+			"autolinkingModuleResolution": true
+		},
+		"backgroundColor": "#09090b"
+	}
+}

@@ -1,0 +1,5 @@
+/** @type {import('@babel/core').TransformOptions} */
+module.exports = {
+	presets: [["module:react-native-builder-bob/babel-preset"]],
+	plugins: ["react-native-worklets/plugin"]
+};
