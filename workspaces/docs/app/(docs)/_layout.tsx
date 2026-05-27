@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Modal, Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Animated, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Slot } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Navbar } from '../../components/Navbar';
 import { Sidebar } from '../../components/Sidebar';
+import { useHydratedViewportWidth } from '../../utils/useHydratedViewportWidth';
 
 export default function DocsLayout() {
-	const { width } = useWindowDimensions();
-	const viewportWidth = Platform.OS === 'web' && typeof window !== 'undefined' ? window.innerWidth : width;
+	const viewportWidth = useHydratedViewportWidth();
 	const isWide = viewportWidth >= 768;
 	const [drawerOpen, setDrawerOpen] = useState(false);
 

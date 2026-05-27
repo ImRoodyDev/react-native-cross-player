@@ -1,7 +1,7 @@
 "use client";
 
-import React, { forwardRef, useCallback, useEffect, useImperativeHandle } from "react";
-import { StatusBar, StyleProp, View as RNView, ViewStyle } from "react-native";
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect } from "react";
+import { Platform, StatusBar, StyleProp, View as RNView, ViewStyle } from "react-native";
 import Video, { OnProgressData, ReactVideoProps, VideoRef } from "react-native-video";
 import PlayerControls, { PlayerControlsRef } from "./PlayerControls";
 import { PlayerControllerProps, usePlayerController } from "../hooks/usePlayerController";
@@ -102,6 +102,15 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 		onPlaybackChange?.(!playerState.paused);
 	}, [onPlaybackChange, playerState.paused]);
 
+	useLayoutEffect(() => {
+		if (Platform.OS !== "web") return;
+		const htmlVideo = videoRef.current?.nativeHtmlVideoRef?.current;
+		if (!htmlVideo) return;
+
+		htmlVideo.controls = false;
+		// htmlVideo.removeAttribute("controls");
+	}, [nativeVideoProps?.source, playerState.sourceId]);
+
 	// Set language for video localization
 	useEffect(() => {
 		setLanguage(language ?? "en");
@@ -129,18 +138,25 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 	}, []);
 
 	return (
-		<View id={"video-player"} className={clsx("video-player", controlsVisible && "video-controls-on")} ref={playerViewRef} style={viewStyle} onPointerMove={handlePointerActivity} onTouchStart={handlePointerActivity}>
+		<View
+			id={"video-player"}
+			className={clsx("video-player", controlsVisible && "video-controls-on")}
+			ref={playerViewRef}
+			style={viewStyle}
+			onPointerMove={handlePointerActivity}
+			onTouchStart={handlePointerActivity}
+		>
 			<StatusBar hidden={playerState.isFullscreen} />
 
 			<Video
 				ref={videoRef}
 				focusable={false}
-				controls={false}
 				disableDisconnectError={false}
 				preventsDisplaySleepDuringVideoPlayback={false}
 				style={[{ width: "100%", height: "auto", margin: "auto" }, videoStyle]}
 				resizeMode={"contain"}
 				{...videoProps}
+				controls={false}
 				paused={playerState.paused}
 			/>
 

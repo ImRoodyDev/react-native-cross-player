@@ -1,7 +1,8 @@
 import React from 'react';
-import { Platform as RNPlatform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Platform as RNPlatform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Link } from 'expo-router';
 import { PlatformBadges } from '../../../components/PlatformBadges';
+import { useHydratedViewportWidth } from '../../../utils/useHydratedViewportWidth';
 
 type Platform = 'ios' | 'android' | 'web' | 'tv';
 
@@ -47,7 +48,7 @@ const COMPONENT_GROUPS = [
 ];
 
 export default function ComponentsIndexPage() {
-	const { width } = useWindowDimensions();
+	const width = useHydratedViewportWidth();
 	const isWide = width >= 900;
 
 	return (

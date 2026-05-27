@@ -13,13 +13,28 @@ export default function PlayerScreen() {
     <VideoPlayer
       videoTitle="Tears of Steel"
       playerConfig={{
+        playerId: 'quick-start-player',
         videoSources: [
-          { uri: 'https://example.com/video.m3u8', title: 'HLS' },
-          { uri: 'https://example.com/video.mp4', title: 'MP4' },
+          {
+            id: 'tos',
+            playerId: 'quick-start-player',
+            label: 'Tears of Steel',
+            source: 'https://tears-of-steel-subtitles.s3.amazonaws.com/tos.mp4',
+            format: 'mp4',
+          },
         ],
         subtitleSources: [
-          { uri: 'https://example.com/en.vtt', title: 'English', language: 'en' },
+          {
+            id: 'english',
+            playerId: 'quick-start-player',
+            source: '/media/tears-en.vtt',
+            label: 'English',
+            langISO: 'en',
+            type: 'vtt',
+          },
         ],
+        initialVideoSource: 0,
+        initialSubtitleSource: 0,
       }}
       viewStyle={{ flex: 1, backgroundColor: '#000' }}
     />
@@ -42,11 +57,12 @@ export default function QuickStartPage() {
 		<DocPage
 			title="Quick Start"
 			description="Start with the bundled player UI, then add callbacks or a ref when another screen needs to drive playback."
+			contentMaxWidth={1080}
 			sections={[
 				{
 					title: 'Preview the media flow',
 					content: (
-						<ComponentPreview code={BASIC_PLAYER} language="tsx" label="PlayerScreen.tsx" height={480}>
+						<ComponentPreview code={BASIC_PLAYER} language="tsx" label="PlayerScreen.tsx" height={700}>
 							<MediaPlayground />
 						</ComponentPreview>
 					),

@@ -17,11 +17,34 @@ export default function PlayerScreen() {
     <VideoPlayer
       videoTitle="Tears of Steel"
       playerConfig={{
-        videoSources: [{ uri: '/media/tos.mp4', title: 'Sample MP4' }],
+        playerId: 'video-player-example',
+        videoSources: [{
+          id: 'tos',
+          playerId: 'video-player-example',
+          label: 'Tears of Steel',
+          source: 'https://tears-of-steel-subtitles.s3.amazonaws.com/tos.mp4',
+          format: 'mp4',
+        }],
         subtitleSources: [
-          { uri: '/media/tears-en.vtt', title: 'English', language: 'en' },
-          { uri: '/media/tears-fr.vtt', title: 'French', language: 'fr' },
+          {
+            id: 'english',
+            playerId: 'video-player-example',
+            source: '/media/tears-en.vtt',
+            label: 'English',
+            langISO: 'en',
+            type: 'vtt',
+          },
+          {
+            id: 'french',
+            playerId: 'video-player-example',
+            source: '/media/tears-fr.vtt',
+            label: 'French',
+            langISO: 'fr',
+            type: 'vtt',
+          },
         ],
+        initialVideoSource: 0,
+        initialSubtitleSource: 0,
       }}
       viewStyle={{ flex: 1, backgroundColor: '#000' }}
     />
@@ -55,9 +78,9 @@ function VideoPlayerSection() {
 
 	return (
 		<View>
-			<ComponentPreview code={BASIC_EXAMPLE} language="tsx" label="video-player.tsx" height={captions ? 520 : 470}>
+			<ComponentPreview code={BASIC_EXAMPLE} language="tsx" label="video-player.tsx" height={captions ? 720 : 660}>
 				<View style={{ width: '100%', gap: 12 }}>
-					{captions ? <MediaPlayground /> : <Text className="text-zinc-400 text-center">Captions hidden in this preview state.</Text>}
+					<MediaPlayground captions={captions} />
 				</View>
 			</ComponentPreview>
 			<PropControls controls={[{ type: 'boolean', label: 'showCaptionsExample', value: captions, onChange: setCaptions }]} />
@@ -72,6 +95,7 @@ export default function VideoPlayerPage() {
 			description="A high-level player component that wires the controller, native video props, media resources, and the built-in controls overlay."
 			platforms={['ios', 'android', 'web', 'tv']}
 			importCode={IMPORT_CODE}
+			contentMaxWidth={1080}
 			sections={[
 				{ title: 'Basic usage', content: <VideoPlayerSection /> },
 				{

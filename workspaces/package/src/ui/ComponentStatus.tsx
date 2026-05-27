@@ -1,5 +1,5 @@
 // External imports
-import { useCallback } from "react";
+import { ComponentProps, useCallback } from "react";
 import { DimensionValue, Platform } from "react-native";
 import Animated, { FadeInLeft } from "react-native-reanimated";
 
@@ -13,8 +13,9 @@ import Spinner from "./Spinner";
 import { LocalizationKeys, t } from "../libs/localization";
 import { useResponsiveSize } from "../hooks/useResponsiveSize";
 import { green, red, zinc } from "tailwindcss/colors";
-import { EntryOrExitLayoutType } from "react-native-reanimated";
 import { View, Text, AnimatedView } from "./styled";
+
+type EntryOrExitLayoutType = ComponentProps<typeof Animated.View>["entering"];
 
 type ComponentStatusProps = {
 	state: StateType;

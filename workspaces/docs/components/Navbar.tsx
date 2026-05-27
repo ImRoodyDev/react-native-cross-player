@@ -1,11 +1,11 @@
 import React from 'react';
-import { Image, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Link, usePathname, useRouter } from 'expo-router';
 import { publicAsset } from '../utils/publicAsset';
+import { useHydratedViewportWidth } from '../utils/useHydratedViewportWidth';
 
 export function Navbar({ onMenuPress }: { onMenuPress?: () => void }) {
-	const { width } = useWindowDimensions();
-	const viewportWidth = Platform.OS === 'web' && typeof window !== 'undefined' ? window.innerWidth : width;
+	const viewportWidth = useHydratedViewportWidth();
 	const isWide = viewportWidth >= 768;
 	const isMobile = viewportWidth < 520;
 
@@ -25,6 +25,8 @@ export function Navbar({ onMenuPress }: { onMenuPress?: () => void }) {
 			<View style={styles.navLeft}>
 				<Link href="/" asChild>
 					<Pressable
+						accessibilityRole="button"
+						accessibilityLabel="Home"
 						style={({ pressed, hovered }) => [
 							styles.logoBtn,
 							hovered && Platform.OS === 'web' ? styles.logoBtnHovered : null,
@@ -53,6 +55,8 @@ export function Navbar({ onMenuPress }: { onMenuPress?: () => void }) {
 							? (window as Window).open('https://www.npmjs.com/package/react-native-cross-player', '_blank')
 							: undefined
 					}
+					accessibilityRole="button"
+					accessibilityLabel="Open npm package"
 					style={({ pressed, hovered }) => [
 						styles.headerActionBtn,
 						hovered && Platform.OS === 'web' ? styles.headerButtonHovered : null,
@@ -69,6 +73,8 @@ export function Navbar({ onMenuPress }: { onMenuPress?: () => void }) {
 							? (window as Window).open('https://github.com/imroodydev/react-native-cross-player', '_blank')
 							: undefined
 					}
+					accessibilityRole="button"
+					accessibilityLabel="Open GitHub repository"
 					style={({ pressed, hovered }) => [
 						styles.headerActionBtn,
 						hovered && Platform.OS === 'web' ? styles.headerButtonHovered : null,
@@ -82,6 +88,8 @@ export function Navbar({ onMenuPress }: { onMenuPress?: () => void }) {
 				{onMenuPress && (
 					<Pressable
 						onPress={onMenuPress}
+						accessibilityRole="button"
+						accessibilityLabel="Open documentation menu"
 						style={({ pressed, hovered }) => [
 							styles.menuBtn,
 							hovered && Platform.OS === 'web' ? styles.headerButtonHovered : null,
@@ -104,6 +112,7 @@ function NavLink({ href, label }: { href: string; label: string }) {
 	return (
 		<Pressable
 			onPress={() => router.push(href as any)}
+			accessibilityRole="button"
 			style={({ pressed, hovered }) => [
 				styles.navLink,
 				active ? styles.navLinkActiveContainer : null,

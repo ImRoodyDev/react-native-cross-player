@@ -74,8 +74,20 @@ import React from "react";
 import { VideoPlayer } from "react-native-cross-player";
 
 export default function App() {
+	const playerId = "demo-player";
 	const playerConfig = {
-		videoSources: [{ uri: "https://example.com/video.m3u8" }]
+		playerId,
+		videoSources: [
+			{
+				id: "main",
+				playerId,
+				label: "Main stream",
+				source: "https://example.com/video.m3u8",
+				format: "m3u8"
+			}
+		],
+		subtitleSources: [],
+		initialVideoSource: 0
 	};
 
 	return (
@@ -99,6 +111,87 @@ You can also import the controls separately:
 ```tsx
 import { VideoPlayer, PlayerControls } from "react-native-cross-player";
 ```
+
+## Build your own video player
+
+`VideoPlayer` is the ready-made player shell, but the package also exports the lower-level pieces used to build it. Use `usePlayerController` when you want your own layout, your own buttons, or a custom TV/mobile/web player surface while still reusing the package playback logic for HLS, subtitles, source switching, proxy handling, fullscreen, audio tracks, and progress state.
+
+The custom-player flow is:
+
+- Render your own `react-native-video` element.
+- Pass `videoRef`, `controlsRef`, and `playerViewRef` into `usePlayerController`.
+- Spread `controller.nativeVideoProps` onto your video element.
+- Keep native video controls disabled and drive playback through `controller.controls`.
+- Render your own UI, or reuse the exported `PlayerControls` overlay.
+
+```tsx
+import React from "react";
+import { Pressable, Text, View } from "react-native";
+import Video from "react-native-video";
+import { PlayerControls, usePlayerController } from "react-native-cross-player";
+
+const playerId = "custom-player";
+
+export function CustomPlayer() {
+	const videoRef = React.useRef(null);
+	const controlsRef = React.useRef(null);
+	const playerViewRef = React.useRef(null);
+
+	const controller = usePlayerController({
+		playerId,
+		videoRef,
+		controlsRef,
+		playerViewRef,
+		videoSources: [
+			{
+				id: "main",
+				playerId,
+				label: "Main stream",
+				source: "https://tears-of-steel-subtitles.s3.amazonaws.com/tos.mp4",
+				format: "mp4"
+			}
+		],
+		subtitleSources: [],
+		initialVideoSource: 0
+	});
+
+	return (
+		<View ref={playerViewRef} style={{ flex: 1, backgroundColor: "black" }}>
+			<Video
+				ref={videoRef}
+				{...controller.nativeVideoProps}
+				controls={false}
+				paused={controller.playerState.paused}
+				resizeMode="contain"
+				style={{ flex: 1 }}
+			/>
+
+			<Pressable onPress={() => controller.controls.setPause(!controller.playerState.paused)}>
+				<Text>{controller.playerState.paused ? "Play" : "Pause"}</Text>
+			</Pressable>
+
+			<PlayerControls
+				ref={controlsRef}
+				videoTitle="Custom player"
+				controls={controller.controls}
+				resources={controller.playbackResources}
+				playerState={controller.playerState}
+			/>
+		</View>
+	);
+}
+```
+
+## Public exports
+
+The package entry exports more than the ready-made components:
+
+- UI: `VideoPlayer`, `PlayerControls`, `VideoPlayerRef`, `PlayerControlsRef`, `ControlsProps`.
+- Controller hooks: `usePlayerController`, `PlayerControllerProps`, `useWebKeyboard`.
+- Media helpers: `createM3U8Source`, `createMasterM3U8Raw`, `createVTTSource`, `convertSRTtoVTT`, `createM3U8File`, `createVTTFile`, `clearBlobFiles`, `clearBlobGroup`, `revokeAllBlobURLs`.
+- HLS/proxy helpers: `HlsProxy`, `HlsProxyManager`, `ProxyLoader`, `ProxyPlaylistLoader`, `ProxyFragmentLoader`, `HlsProxyConfig`, `ProxyURLResolverCallback`.
+- Types: `VideoSource`, `SubtitleSource`, `SourceRequestOptions`, `M3U8BlobOptions`, `M3U8PlaylistTrack`, `M38USubtitleTrack`, `M3U8AudioTrack`, `SubtitleBlobOptions`, `SourceTypes`, `SubtitleTypes`, `TextEncoding`, `VideoFormats`.
+- Utilities: `CustomPlayerError`, `isCustomPlayerError`, `detectSourceType`, `detectSubtitleType`, `detectSubtitleEncoding`, `CNPLogger`, `ProxyLogger`, `CSS_PATH`.
 
 ## API & exports
 
@@ -280,7 +373,15 @@ Example usage (concise `playerConfig`):
 
 ```ts
 const playerConfig = {
-	videoSources: [{ uri: 'https://example.com/stream.m3u8' }],
+	playerId: 'demo-player',
+	videoSources: [{
+		id: 'main',
+		playerId: 'demo-player',
+		label: 'Main stream',
+		source: 'https://example.com/stream.m3u8',
+		format: 'm3u8'
+	}],
+	subtitleSources: [],
 	initialVideoSource: -1,
 	autoStart: false,
 	proxyURL: 'https://proxy.example.com'

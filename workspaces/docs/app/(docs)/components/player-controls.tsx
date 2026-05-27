@@ -13,7 +13,16 @@ import { PlayerControls, usePlayerController } from 'react-native-cross-player';
 
 export default function CustomShell() {
   const controller = usePlayerController({
-    videoSources: [{ uri: 'https://example.com/video.m3u8' }],
+    playerId: 'custom-shell',
+    videoSources: [{
+      id: 'main',
+      playerId: 'custom-shell',
+      label: 'Main stream',
+      source: 'https://example.com/video.m3u8',
+      format: 'm3u8',
+    }],
+    subtitleSources: [],
+    initialVideoSource: 0,
   });
 
   return (

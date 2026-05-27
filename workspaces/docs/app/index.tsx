@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Navbar } from '../components/Navbar';
@@ -7,6 +7,7 @@ import { PlatformBadges } from '../components/PlatformBadges';
 import { ComponentPreview } from '../components/ComponentPreview';
 import { MediaPlayground } from '../components/MediaPlayground';
 import { publicAsset } from '../utils/publicAsset';
+import { useHydratedViewportWidth } from '../utils/useHydratedViewportWidth';
 
 const STATS = [
 	{ value: 'HLS', label: 'Streams' },
@@ -28,7 +29,7 @@ const FEATURES = [
 	},
 	{
 		title: 'Media playground',
-		description: 'Docs include bundled MP4 and VTT examples plus a URL tester for remote media.',
+		description: 'Docs include a remote MP4, bundled VTT examples, and a URL tester for custom media.',
 		accent: '#f59e0b',
 	},
 ];
@@ -59,14 +60,30 @@ const SAMPLE_CODE = `import { VideoPlayer } from 'react-native-cross-player';
 <VideoPlayer
   videoTitle="Tears of Steel"
   playerConfig={{
-    videoSources: [{ uri: '/media/tos.mp4', title: 'Sample MP4' }],
-    subtitleSources: [{ uri: '/media/tears-en.vtt', title: 'English' }],
+    playerId: 'docs-player',
+    videoSources: [{
+      id: 'tos',
+      playerId: 'docs-player',
+      label: 'Tears of Steel',
+      source: 'https://tears-of-steel-subtitles.s3.amazonaws.com/tos.mp4',
+      format: 'mp4',
+    }],
+    subtitleSources: [{
+      id: 'english',
+      playerId: 'docs-player',
+      source: '/media/tears-en.vtt',
+      label: 'English',
+      langISO: 'en',
+      type: 'vtt',
+    }],
+    initialVideoSource: 0,
+    initialSubtitleSource: 0,
   }}
 />;
 `;
 
 export default function HomeScreen() {
-	const { width } = useWindowDimensions();
+	const width = useHydratedViewportWidth();
 	const router = useRouter();
 	const isWide = width >= 768;
 	const isXWide = width >= 1100;
@@ -132,10 +149,18 @@ export default function HomeScreen() {
 					</View>
 
 					<View style={styles.ctaRow}>
-						<Pressable onPress={() => router.push('/components/video-player' as any)} style={({ pressed }) => [styles.ctaPrimary, pressed && styles.ctaPressed]}>
+						<Pressable
+							onPress={() => router.push('/components/video-player' as any)}
+							accessibilityRole="button"
+							style={({ pressed }) => [styles.ctaPrimary, pressed && styles.ctaPressed]}
+						>
 							<Text style={styles.ctaPrimaryText}>Read Docs</Text>
 						</Pressable>
-						<Pressable onPress={() => router.push('/components/media-playground' as any)} style={({ pressed }) => [styles.ctaSecondary, pressed && { opacity: 0.7 }]}>
+						<Pressable
+							onPress={() => router.push('/components/media-playground' as any)}
+							accessibilityRole="button"
+							style={({ pressed }) => [styles.ctaSecondary, pressed && { opacity: 0.7 }]}
+						>
 							<Text style={styles.ctaSecondaryText}>Try Media</Text>
 						</Pressable>
 					</View>
@@ -167,7 +192,7 @@ export default function HomeScreen() {
 						<Text style={styles.sectionSub}>The docs examples use the same Preview / Code switch throughout.</Text>
 					</View>
 					<View style={styles.previewWrap}>
-						<ComponentPreview code={SAMPLE_CODE} language="tsx" label="VideoPlayerExample.tsx" height={520}>
+						<ComponentPreview code={SAMPLE_CODE} language="tsx" label="VideoPlayerExample.tsx" height={700}>
 							<MediaPlayground />
 						</ComponentPreview>
 					</View>
@@ -207,7 +232,7 @@ function InstallSnippet() {
 			<Text style={styles.installCmd} numberOfLines={1}>
 				{cmd}
 			</Text>
-			<Pressable onPress={handleCopy} style={({ pressed }) => [styles.copyBtn, pressed && { opacity: 0.6 }]}>
+			<Pressable onPress={handleCopy} accessibilityRole="button" style={({ pressed }) => [styles.copyBtn, pressed && { opacity: 0.6 }]}>
 				<Text style={styles.copyBtnText}>{copied ? 'Copied' : 'Copy'}</Text>
 			</Pressable>
 		</View>
@@ -233,6 +258,7 @@ function ComponentCard({
 	return (
 		<Pressable
 			onPress={onPress}
+			accessibilityRole="button"
 			style={({ hovered, pressed }) => [
 				styles.componentCard,
 				{ width: cardWidth, borderColor: color + '45' },
@@ -358,7 +384,7 @@ const styles = StyleSheet.create({
 	},
 	featureTitle: { color: '#ffffff', fontSize: 15, fontWeight: '600', marginBottom: 6 },
 	featureDesc: { color: '#71717a', fontSize: 13, lineHeight: 20 },
-	previewWrap: { width: '100%', maxWidth: 900, alignSelf: 'center' },
+	previewWrap: { width: '100%', maxWidth: 1080, alignSelf: 'center' },
 	componentsGrid: { width: '100%', maxWidth: 1100, alignSelf: 'center', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 16 },
 	componentCard: { backgroundColor: '#0f0f12', borderWidth: 1, borderRadius: 14, overflow: 'hidden', minHeight: 160, transitionDuration: '180ms' },
 	componentCardHovered: { backgroundColor: '#141418', transform: [{ translateY: -3 }] },

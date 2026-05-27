@@ -1,7 +1,8 @@
 import React from 'react';
-import { Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { CodeBlock } from './CodeBlock';
 import { PlatformBadges } from './PlatformBadges';
+import { useHydratedViewportWidth } from '../utils/useHydratedViewportWidth';
 
 type SupportedPlatform = 'ios' | 'android' | 'web' | 'tv';
 
@@ -16,14 +17,15 @@ type Props = {
 	platforms?: SupportedPlatform[];
 	importCode?: string;
 	sections?: Section[];
+	contentMaxWidth?: number;
 };
 
-export function DocPage({ title, description, platforms, importCode, sections = [] }: Props) {
-	const { width } = useWindowDimensions();
+export function DocPage({ title, description, platforms, importCode, sections = [], contentMaxWidth = 780 }: Props) {
+	const width = useHydratedViewportWidth();
 	const px = width >= 1024 ? 48 : 24;
 
 	const innerContent = (
-		<View style={[styles.contentWrap, { paddingHorizontal: px }]}>
+		<View style={[styles.contentWrap, { paddingHorizontal: px, maxWidth: contentMaxWidth }]}>
 			<View style={styles.pageHeader}>
 				<Text style={styles.pageTitle}>{title}</Text>
 				{platforms && (
@@ -127,7 +129,6 @@ const styles = StyleSheet.create({
 	},
 	contentWrap: {
 		width: '100%',
-		maxWidth: 780,
 		paddingTop: 52,
 	},
 	pageHeader: {

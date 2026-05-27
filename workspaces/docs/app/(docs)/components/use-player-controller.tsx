@@ -14,12 +14,32 @@ import { usePlayerController } from 'react-native-cross-player';
 
 export default function CustomPlayer() {
   const controller = usePlayerController({
+    playerId: 'custom-player',
     videoSources: [
-      { uri: 'https://example.com/720.m3u8', title: '720p' },
-      { uri: 'https://example.com/1080.m3u8', title: '1080p' },
+      {
+        id: 'hls-720',
+        playerId: 'custom-player',
+        label: '720p',
+        source: 'https://example.com/720.m3u8',
+        format: 'm3u8',
+      },
+      {
+        id: 'hls-1080',
+        playerId: 'custom-player',
+        label: '1080p',
+        source: 'https://example.com/1080.m3u8',
+        format: 'm3u8',
+      },
     ],
     subtitleSources: [
-      { uri: 'https://example.com/en.vtt', title: 'English', language: 'en' },
+      {
+        id: 'english',
+        playerId: 'custom-player',
+        source: 'https://example.com/en.vtt',
+        label: 'English',
+        langISO: 'en',
+        type: 'vtt',
+      },
     ],
     initialVideoSource: 0,
   });

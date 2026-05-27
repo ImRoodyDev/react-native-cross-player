@@ -45,6 +45,13 @@ module.exports = (() => {
 			};
 		}
 
+		if (moduleName === 'pretty-format') {
+			return {
+				type: 'sourceFile',
+				filePath: path.resolve(monorepoRoot, 'node_modules/pretty-format/build/index.js'),
+			};
+		}
+
 		return defaultResolveRequest
 			? defaultResolveRequest(context, moduleName, platform)
 			: context.resolveRequest(context, moduleName, platform);
