@@ -1,0 +1,44 @@
+# Source
+src/
+index.ts
+
+# Development files
+*.config.js
+.github/
+.eslintrc.js
+.eslintignore
+tsconfig.json
+jest.config.js
+.gitignore
+
+# Tests
+__tests__/
+*.test.ts
+*.spec.ts
+
+# Misc
+.DS_Store
+*.log
+.vscode/
+.idea/
+node_modules/
+coverage/
+
+# Build process files
+webpack.config.js
+rollup.config.js
+babel.config.js
+
+# Environment files
+.env*
+
+setup-tests.js
+coverage
+yarn-error.log
+*.png
+.circleci/config.yml
+.eslintcache
+
+
+# Documentation
+docs/

@@ -1,6 +1,0 @@
-#EXTM3U
-#EXT-X-TARGETDURATION:10
-#EXTINF:10,
-segment1.ts
-#EXTINF:10,
-segment2.ts

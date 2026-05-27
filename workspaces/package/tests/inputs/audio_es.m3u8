@@ -1,0 +1,6 @@
+#EXTM3U
+#EXT-X-TARGETDURATION:10
+#EXTINF:10,
+audio_es_seg1.aac
+#EXTINF:10,
+audio_es_seg2.aac

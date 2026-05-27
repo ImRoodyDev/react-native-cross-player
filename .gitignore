@@ -1,5 +1,12 @@
+.vscode/
+.expo/
+.expo-shared/
+.idea/
 # dependencies
 node_modules/
+.npm-cache/
+package-lock.json
+yarn.lock
 
 dist/
 web-build/
@@ -28,14 +35,12 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
+.env.*
 .env*.local
 
 # typescript
 *.tsbuildinfo
-
-# Test generated files
-__tests__/CNP_Cache/*
-*/CNP_Cache/*
-docs/*
-
-# @end expo-cli
+PUBLISHING.md
+*.log
+reviews/
