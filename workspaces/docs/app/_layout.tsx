@@ -6,7 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 export default function RootLayout() {
 	return (
-		<GestureHandlerRootView style={{ flex: 1 }}>
+		<GestureHandlerRootView className="responsive-vars" style={{ flex: 1 }}>
 			<SafeAreaProvider>
 				<StatusBar style="light" backgroundColor="#09090b" />
 				<Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#09090b' } }} />

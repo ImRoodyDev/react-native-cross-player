@@ -29,7 +29,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 export default function App({ children }: { children: React.ReactNode }) {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView className="responsive-vars" style={{ flex: 1 }}>
       <SafeAreaProvider>{children}</SafeAreaProvider>
     </GestureHandlerRootView>
   );
@@ -81,6 +81,10 @@ export default function InstallationPage() {
 						<View className="gap-3">
 							<Callout type="info">For web, import the player CSS once in your global stylesheet or app entry.</Callout>
 							<CodeBlock code={WEB_CSS} language="css" />
+							<Text className="text-zinc-400 text-sm leading-6">
+								The CSS defines player sizing variables under the `responsive-vars` class. Add that class to your app
+								root so every player can read `--side-padding`, `--h1-size`, and the other responsive variables.
+							</Text>
 						</View>
 					),
 				},
@@ -89,7 +93,8 @@ export default function InstallationPage() {
 					content: (
 						<View className="gap-3">
 							<Text className="text-zinc-400 text-sm leading-6">
-								Mount gesture and safe-area providers around screens that render the player.
+								Mount gesture and safe-area providers around screens that render the player, and keep `responsive-vars`
+								on the application root. Without that class, the CSS variables used by the controls are not defined.
 							</Text>
 							<CodeBlock code={PROVIDER_SETUP} language="tsx" />
 						</View>
