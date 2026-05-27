@@ -114,8 +114,15 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 		[closeDropdown, triggeredDropdown]
 	);
 
-	const seekForward = useCallback(() => props.controls.setCurrentTime(Math.min(playerCurrentTime.value + 10, playerDurationTime.value)), [props.controls]);
-	const seekBackward = useCallback(() => props.controls.setCurrentTime(Math.max(playerCurrentTime.value - 10, 0)), [props.controls]);
+	const seekForward = useCallback(() => {
+		const currentTime = Number.isFinite(playerCurrentTime.value) ? playerCurrentTime.value : 0;
+		const duration = Number.isFinite(playerDurationTime.value) && playerDurationTime.value > 0 ? playerDurationTime.value : Infinity;
+		props.controls.setCurrentTime(Math.min(currentTime + 10, duration));
+	}, [props.controls]);
+	const seekBackward = useCallback(() => {
+		const currentTime = Number.isFinite(playerCurrentTime.value) ? playerCurrentTime.value : 0;
+		props.controls.setCurrentTime(Math.max(currentTime - 10, 0));
+	}, [props.controls]);
 	const togglePlay = useCallback(() => props.controls.setPause(!props.playerState.paused), [props.controls, props.playerState.paused]);
 	const toggleFullscreen = useCallback(() => props.controls.setFullscreen(!props.playerState.isFullscreen), [props.controls, props.playerState.isFullscreen]);
 	const toggleMute = useCallback(() => props.controls.setMuted(props.playerState.volume > 0), [props.controls, props.playerState.volume]);

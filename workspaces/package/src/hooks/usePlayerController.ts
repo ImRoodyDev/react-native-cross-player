@@ -159,6 +159,7 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 	const pendingSeekRef = useRef<number | undefined>(undefined);
 	const pendingSeekRetryRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 	const pendingSeekAttemptsRef = useRef<number>(0);
+	const pendingSeekSourceRef = useRef<"source-change" | "user">("source-change");
 	const sourceSwitchInFlightRef = useRef<boolean>(false);
 	const blockPositionUpdatesRef = useRef<boolean>(false);
 	const [paused, setPaused] = useState<boolean>(!autoStart);
@@ -286,6 +287,7 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 	const clearPendingSeek = useCallback(() => {
 		pendingSeekRef.current = undefined;
 		pendingSeekAttemptsRef.current = 0;
+		pendingSeekSourceRef.current = "source-change";
 		clearPendingSeekRetry();
 	}, [clearPendingSeekRetry]);
 
@@ -299,6 +301,7 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 		}
 
 		try {
+			const pendingSeekSource = pendingSeekSourceRef.current;
 			// On web, the HTMLVideoElement may not be ready immediately after source change, even if the React ref is set.
 			if (Platform.OS === "web" && videoRef.current.nativeHtmlVideoRef?.current) {
 				const htmlVideo = videoRef.current.nativeHtmlVideoRef.current;
@@ -312,10 +315,14 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 				}
 			}
 
-			// If we have a valid seek time, apply it now that the media is ready. This handles the common case of preserving
-			videoRef.current.seek(seekTime);
+			if (Platform.OS === "web" && videoRef.current.nativeHtmlVideoRef?.current) {
+				videoRef.current.nativeHtmlVideoRef.current.currentTime = seekTime;
+			} else {
+				videoRef.current.seek(seekTime);
+			}
+
 			lastPositionRef.current = seekTime;
-			CNPLogger.info("Applied pending seek after source change:", seekTime);
+			CNPLogger.info(`Applied pending ${pendingSeekSource} seek:`, seekTime);
 			clearPendingSeek();
 		} catch (error) {
 			if (pendingSeekAttemptsRef.current < 15) {
@@ -655,6 +662,7 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 				const requestedStartTime = preservePlaybackOnSourceChange ? currentPos : startPosition;
 				const startTime = isValidTime(requestedStartTime) ? requestedStartTime : 0;
 				pendingSeekRef.current = startTime;
+				pendingSeekSourceRef.current = "source-change";
 				pendingSeekAttemptsRef.current = 0;
 				clearPendingSeekRetry();
 
@@ -843,13 +851,25 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 	const setCurrentTime = useCallback(
 		(position: number) => {
 			if (sourceId === -1) return;
-			if (videoRef.current && typeof position === "number" && isFinite(position)) {
-				videoRef.current.seek(position);
-			} else {
+			if (typeof position !== "number" || !isFinite(position)) {
 				CNPLogger.warn(`Attempted to seek with an invalid position: ${position}`);
+				return;
+			}
+
+			const nextPosition = Math.max(0, position);
+			lastPositionRef.current = nextPosition;
+			pendingSeekRef.current = nextPosition;
+			pendingSeekSourceRef.current = "user";
+			pendingSeekAttemptsRef.current = 0;
+			clearPendingSeekRetry();
+
+			if (videoRef.current) {
+				applyPendingSeek();
+			} else {
+				CNPLogger.warn("Attempted to seek before the video reference was available.");
 			}
 		},
-		[sourceId]
+		[sourceId, applyPendingSeek, clearPendingSeekRetry]
 	);
 
 	const setFullscreen = useCallback((enable: boolean) => {
