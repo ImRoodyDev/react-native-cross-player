@@ -12,13 +12,18 @@ const BABEL_CONFIG = `// babel.config.js
 module.exports = function (api) {
   api.cache(true);
   return {
-    presets: ['babel-preset-expo'],
-    plugins: [
-      'nativewind/babel',
-      'react-native-reanimated/plugin',
-    ],
+    presets: [['babel-preset-expo', { jsxImportSource: 'nativewind' }], 'nativewind/babel'],
+    plugins: ['@babel/plugin-proposal-export-namespace-from', 'react-native-reanimated/plugin'],
   };
 };`;
+
+const METRO_CONFIG = `// metro.config.js
+const { getDefaultConfig } = require('expo/metro-config');
+const { withNativeWind } = require('nativewind/metro');
+
+const config = getDefaultConfig(__dirname);
+
+module.exports = withNativeWind(config, { input: './global.css' });`;
 
 const WEB_CSS = `/* global.css */
 @import "react-native-cross-player/styles.css";`;
@@ -65,13 +70,18 @@ export default function InstallationPage() {
 					),
 				},
 				{
-					title: '3. Configure NativeWind and Reanimated',
+					title: '3. Configure Babel and Metro',
 					content: (
 						<View className="gap-3">
 							<Text className="text-zinc-400 text-sm leading-6">
-								NativeWind powers the built-in controls. Keep Reanimated as the last Babel plugin.
+								NativeWind powers the built-in controls. Use the NativeWind JSX import source and keep Reanimated as
+								the last Babel plugin.
 							</Text>
 							<CodeBlock code={BABEL_CONFIG} language="js" />
+							<Text className="text-zinc-400 text-sm leading-6">
+								Metro also needs to load your global stylesheet through NativeWind.
+							</Text>
+							<CodeBlock code={METRO_CONFIG} language="js" />
 						</View>
 					),
 				},
