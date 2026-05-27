@@ -32,7 +32,7 @@ export function Navbar({ onMenuPress }: { onMenuPress?: () => void }) {
 						]}
 					>
 						<View style={styles.logoBadge}>
-							<Image source={{ uri: publicAsset('img/ctn-icon.png') }} style={styles.logoImage} resizeMode="cover" />
+							<Image source={{ uri: publicAsset('img/ctn-square.png') }} style={styles.logoImage} resizeMode="cover" />
 						</View>
 					</Pressable>
 				</Link>

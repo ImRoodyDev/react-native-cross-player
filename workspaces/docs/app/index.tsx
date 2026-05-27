@@ -106,8 +106,8 @@ export default function HomeScreen() {
 						<Text style={styles.badgeText}>React Native + Web + HLS</Text>
 					</View>
 
-					<View style={[styles.heroIconWrap, { width: isWide ? 112 : 84, height: isWide ? 112 : 84 }]}>
-						<Image source={{ uri: publicAsset('img/ctn-square.png') }} style={styles.heroIconImage} resizeMode="cover" />
+					<View style={[styles.heroIconWrap, { width: isWide ? 132 : 96, height: isWide ? 132 : 96 }]}>
+						<Image source={{ uri: publicAsset('img/ctn-icon.png') }} style={styles.heroIconImage} resizeMode="contain" />
 					</View>
 
 					<Text
@@ -273,14 +273,9 @@ const styles = StyleSheet.create({
 	badgeDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#4ade80' },
 	badgeText: { color: '#a1a1aa', fontSize: 12, fontWeight: '500' },
 	heroIconWrap: {
-		borderRadius: 24,
 		alignItems: 'center',
 		justifyContent: 'center',
 		marginBottom: 18,
-		backgroundColor: 'rgba(9,9,11,0.34)',
-		borderWidth: 1,
-		borderColor: 'rgba(255,255,255,0.18)',
-		overflow: 'hidden',
 	},
 	heroIconImage: { width: '100%', height: '100%' },
 	headline: { color: '#ffffff', fontWeight: '800', textAlign: 'center', letterSpacing: 0, marginBottom: 20, maxWidth: '86%' },
