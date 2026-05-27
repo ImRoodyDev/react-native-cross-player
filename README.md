@@ -54,15 +54,24 @@ import "react-native-cross-player/styles.css";
 **For Native (iOS/Android):** The styles are applied via NativeWind's className processing. Make sure your `babel.config.js` includes:
 
 ```js
-module.exports = {
-	presets: [
-		// ... your other presets
-	],
-	plugins: [
-		"nativewind/babel"
-		// ... your other plugins
-	]
+module.exports = function (api) {
+	api.cache(true);
+	return {
+		presets: [['babel-preset-expo', { jsxImportSource: 'nativewind' }], 'nativewind/babel'],
+		plugins: ['@babel/plugin-proposal-export-namespace-from', 'react-native-reanimated/plugin'],
+	};
 };
+```
+
+Your Expo Metro config should pass the same global CSS entry to NativeWind:
+
+```js
+const { getDefaultConfig } = require('expo/metro-config');
+const { withNativeWind } = require('nativewind/metro');
+
+const config = getDefaultConfig(__dirname);
+
+module.exports = withNativeWind(config, { input: './global.css' });
 ```
 
 ## Usage
