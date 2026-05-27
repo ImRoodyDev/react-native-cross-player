@@ -22,6 +22,9 @@
 		"react-native-reanimated": "~3.17.4",
 		"react-native-video": "^6.19.2"
 	},
+	"optionalDependencies": {
+		"lightningcss-linux-x64-gnu": "1.27.0"
+	},
 	"scripts": {
 		"start": "npm run start -w docs",
 		"build:docs": "npm run build:web -w docs",
