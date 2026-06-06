@@ -41,6 +41,22 @@ const subtitleSource: SubtitleSource = {
   type: 'vtt',
 };`;
 
+const PROXY_OPTIONS_EXAMPLE = `const sourceWithProxy: VideoSource = {
+  id: 'private',
+  playerId: 'typed-player',
+  label: 'Private stream',
+  source: 'https://cdn.example.com/private/master.m3u8',
+  format: 'm3u8',
+  options: {
+    useProxy: true,
+    overrideProxyURL: 'https://api.example.com/proxy',
+    headers: {
+      Authorization: 'Bearer token',
+    },
+    nativeSendHeadersOnSourceRequest: false,
+  },
+};`;
+
 const DETECTORS_EXAMPLE = `const sourceType = detectSourceType('https://example.com/video.m3u8');
 const subtitleType = detectSubtitleType('WEBVTT\\n\\n00:00:01.000 --> 00:00:02.000\\nHello');
 const encoding = detectSubtitleEncoding(rawSubtitleText);
@@ -74,6 +90,13 @@ const PUBLIC_TYPES: PropRow[] = [
 	{ name: 'CSS_PATH', type: 'const', description: 'String path for the package CSS export.' },
 ];
 
+const SOURCE_REQUEST_OPTIONS: PropRow[] = [
+	{ name: 'useProxy', type: 'boolean', required: true, description: 'Whether this source or subtitle should be resolved through the proxy resolver.' },
+	{ name: 'overrideProxyURL', type: 'string', description: 'Per-item proxy endpoint. Falls back to playerConfig.proxyURL when omitted.' },
+	{ name: 'headers', type: 'Record<string,string>', description: 'Headers passed to the resolver and used for proxied fetches.' },
+	{ name: 'nativeSendHeadersOnSourceRequest', type: 'boolean', default: 'false', description: 'For native platforms, sends headers directly on the react-native-video source request.' },
+];
+
 const UTILITIES: PropRow[] = [
 	{ name: 'detectSourceType', type: '(source) => SourceTypes', description: 'Detects whether a source is a URL, blob URL, or native path.' },
 	{ name: 'detectSubtitleType', type: '(content) => SubtitleTypes | null', description: 'Detects SRT or WebVTT subtitle text.' },
@@ -103,6 +126,15 @@ export default function TypesUtilitiesPage() {
 						<View className="gap-3">
 							<BodyText>Use these shapes in `VideoPlayer`, `usePlayerController`, and media helper calls.</BodyText>
 							<CodeBlock code={TYPES_EXAMPLE} language="ts" />
+						</View>
+					),
+				},
+				{
+					title: 'SourceRequestOptions fields',
+					content: (
+						<View className="gap-3">
+							<PropsTable props={SOURCE_REQUEST_OPTIONS} />
+							<CodeBlock code={PROXY_OPTIONS_EXAMPLE} language="ts" />
 						</View>
 					),
 				},
