@@ -52,6 +52,50 @@ const CALLBACKS = `<VideoPlayer
 />;
 `;
 
+const PROXY_PLAYER = `import { VideoPlayer, type ProxyURLResolverCallback } from 'react-native-cross-player';
+
+const proxyResolver: ProxyURLResolverCallback = (targetURL, proxyURL, headers) => {
+  const url = new URL(proxyURL);
+  url.searchParams.set('url', targetURL);
+
+  for (const [name, value] of Object.entries(headers)) {
+    url.searchParams.append(\`header.\${name}\`, value);
+  }
+
+  return url.toString();
+};
+
+const playerId = 'proxy-player';
+
+export function ProxiedPlayer() {
+  return (
+    <VideoPlayer
+      videoTitle="Private HLS"
+      playerConfig={{
+        playerId,
+        proxyURL: 'https://api.example.com/media-proxy',
+        proxyResolver,
+        videoSources: [
+          {
+            id: 'private-hls',
+            playerId,
+            label: 'Private HLS',
+            source: 'https://cdn.example.com/protected/master.m3u8',
+            format: 'm3u8',
+            options: {
+              useProxy: true,
+              headers: { Authorization: 'Bearer user-token' },
+            },
+          },
+        ],
+        subtitleSources: [],
+        initialVideoSource: 0,
+      }}
+      viewStyle={{ flex: 1, backgroundColor: '#000' }}
+    />
+  );
+}`;
+
 export default function QuickStartPage() {
 	return (
 		<DocPage
@@ -77,6 +121,18 @@ export default function QuickStartPage() {
 							</Text>
 							<CodeBlock code={CALLBACKS} language="tsx" />
 							<Callout type="tip">Use these callbacks to sync playlists, analytics, watched progress, and subtitles UI.</Callout>
+						</View>
+					),
+				},
+				{
+					title: 'Proxy a protected source',
+					content: (
+						<View className="gap-3">
+							<Text className="text-zinc-400 text-sm leading-6">
+								Set `playerConfig.proxyURL` once, then opt each source or subtitle into proxying with `options.useProxy`.
+							</Text>
+							<CodeBlock code={PROXY_PLAYER} language="tsx" />
+							<Callout type="info">Use `options.overrideProxyURL` on a source when one item needs a different proxy endpoint.</Callout>
 						</View>
 					),
 				},

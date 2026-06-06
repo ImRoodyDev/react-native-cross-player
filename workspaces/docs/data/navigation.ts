@@ -10,6 +10,7 @@ export const navigation: NavItem[] = [
 		children: [
 			{ title: 'Installation', href: '/installation' },
 			{ title: 'Quick Start', href: '/quick-start' },
+			{ title: 'Examples', href: '/examples' },
 		],
 	},
 	{
