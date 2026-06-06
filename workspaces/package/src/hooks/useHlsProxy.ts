@@ -1,7 +1,7 @@
 import Hls, { AudioTrackSwitchedData, ErrorData, LevelSwitchedData } from "hls.js";
 import { HlsProxy } from "../controllers/hls-proxy";
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
-import { HlsProxyConfig } from "../types/hls";
+import { HlsProxyConfig, ProxyURLResolverCallback } from "../types/hls";
 import { SourceRequestOptions } from "../types/media";
 import { OnVideoErrorData } from "react-native-video";
 import { CNPLogger } from "../utils/logger";
@@ -19,6 +19,7 @@ const DEFAULT_HLS_PROXY_CONFIG: HlsProxyConfig = {
 
 type Props = {
 	hlsConfig?: HlsProxyConfig["hlsConfig"];
+	proxyResolver?: ProxyURLResolverCallback;
 	videoRef?: React.RefObject<any>;
 	onManifestParsed: () => void;
 	onLevelSwitched: (event: string, data: LevelSwitchedData) => void;
@@ -27,7 +28,7 @@ type Props = {
 };
 
 export function useHlsProxy(props: Props) {
-	const { hlsConfig, videoRef, onManifestParsed, onLevelSwitched, onAudioTrackSwitched, onError } = props || {};
+	const { hlsConfig, proxyResolver, videoRef, onManifestParsed, onLevelSwitched, onAudioTrackSwitched, onError } = props || {};
 	const hlsRef = useRef<HlsProxy | null>(null);
 	const [hlsCreated, setHlsCreated] = React.useState(false);
 	const isHlsSupported = useMemo(() => HlsProxy.isSupported() && typeof window !== "undefined", []);
@@ -82,11 +83,13 @@ export function useHlsProxy(props: Props) {
 			// Recreate if not present
 			if (!hlsRef.current) createHLS();
 			if (!hlsCreated) setHlsCreated(true);
-			
+
+			if (proxyResolver) hlsRef.current?.setProxyTunnelURLResolver(proxyResolver);
+
 			// Forward optional startTime to underlying HlsProxy implementation
 			hlsRef.current?.setSource(source, options, startTime);
 		},
-		[createHLS, hlsCreated, isHlsSupported]
+		[createHLS, hlsCreated, isHlsSupported, proxyResolver]
 	);
 
 	const stopLoad = useCallback(() => {

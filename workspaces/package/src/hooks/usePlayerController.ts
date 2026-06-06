@@ -559,6 +559,7 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 		runDestroy: destroyHls
 	} = useHlsProxy({
 		hlsConfig,
+		proxyResolver,
 		videoRef,
 		onError,
 		onManifestParsed: onLoadMetadata,
