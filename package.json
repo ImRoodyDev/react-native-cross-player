@@ -31,8 +31,10 @@
 		"typecheck:docs": "npm run typecheck -w docs",
 		"build:pkg:local": "npm run build:local -w react-native-cross-player",
 		"build:pkg": "npm run build -w react-native-cross-player",
-		"pack:pkg:dry-run": "npm run pack:dry-run -w react-native-cross-player",
-		"publish:pkg:alpha": "npm run release:alpha -w react-native-cross-player",
-		"publish:pkg:latest": "npm run release:latest -w react-native-cross-player"
+		"npm:publish": "npm run npm:publish -w react-native-cross-player",
+		"npm:publish:alpha": "npm run npm:publish:alpha -w react-native-cross-player",
+		"npm:publish:dry-run": "npm run npm:publish:dry-run -w react-native-cross-player",
+		"dotenv:npm:publish": "npm run dotenv:npm:publish -w react-native-cross-player",
+		"dotenv:npm:publish:alpha": "npm run dotenv:npm:publish:alpha -w react-native-cross-player"
 	}
 }
