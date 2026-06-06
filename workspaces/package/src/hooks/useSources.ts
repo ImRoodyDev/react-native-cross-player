@@ -35,14 +35,20 @@ export function useSources(params: UseSourcesParams) {
 			};
 
 			// If the source was updated by the callback, use the updated source for proxy resolution and blob URL creation
+			// Default ProxyURL override by source options if not already set, allowing per-source proxy URL specification
 			if (updatedVideo.options && !updatedVideo.options.overrideProxyURL) updatedVideo.options.overrideProxyURL = proxyURL;
 
 			// Create m3u8 source for non-web platforms, otherwise resolve proxy if needed
 			if (updatedVideo.format === "m3u8" && Platform.OS !== "web" && updatedVideo.options?.useProxy) {
 				updatedVideo.source = await createM3U8Source(updatedVideo, proxyResolver).catch(() => "");
 			} else {
-				if (proxyResolver && updatedVideo.options?.useProxy)
+				// NOTE:
+				// On web resolve if we resolve the source to the proxy URL and the source is an m3u8 and it contains playlist tag with
+				// relative segments, the player will fail to load the source because it won't be able to resolve the relative segment URLs from the proxy URL.
+				// To avoid this we only resolve the proxy URL on web without transforming the source into a blob URL, allowing the player to handle the m3u8 parsing and segment loading as if it were a regular URL, while still benefiting from the proxy for CORS and other proxy-related features.
+				if (updatedVideo.format !== "m3u8" && proxyResolver && updatedVideo.options?.useProxy)
 					updatedVideo.source = proxyResolver(updatedVideo.source, proxyURL || "", updatedVideo.options?.headers || {});
+				else updatedVideo.source = video.source;
 			}
 
 			createdSourcesRef.current.set(updatedVideo.id, updatedVideo);

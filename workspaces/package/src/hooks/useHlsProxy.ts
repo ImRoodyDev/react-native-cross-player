@@ -84,9 +84,11 @@ export function useHlsProxy(props: Props) {
 			if (!hlsRef.current) createHLS();
 			if (!hlsCreated) setHlsCreated(true);
 
+			// This will update the proxy tunnel URL resolver in the HlsProxy instance, allowing dynamic resolution of proxy URLs for each source request.
 			if (proxyResolver) hlsRef.current?.setProxyTunnelURLResolver(proxyResolver);
 
 			// Forward optional startTime to underlying HlsProxy implementation
+			// This will check if proxy options are provided and enable the proxy loader accordingly, as well as set any override URL or headers for the proxy tunnel.
 			hlsRef.current?.setSource(source, options, startTime);
 		},
 		[createHLS, hlsCreated, isHlsSupported, proxyResolver]
