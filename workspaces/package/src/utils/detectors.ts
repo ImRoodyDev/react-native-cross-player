@@ -66,3 +66,11 @@ export function detectSourceType(source: string): SourceTypes {
 		return SourceTypes.URL;
 	}
 }
+
+/**
+ * True when the source is an http(s) URL hosted on a web server — the only kind of URI
+ * react-native-video accepts for side-loaded `textTracks` on native players.
+ */
+export function isRemoteWebURL(source?: string): source is string {
+	return !!source && /^https?:\/\//i.test(source);
+}

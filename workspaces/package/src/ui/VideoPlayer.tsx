@@ -2,10 +2,11 @@
 
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect } from "react";
 import { Platform, StatusBar, StyleProp, View as RNView, ViewStyle } from "react-native";
-import Video, { OnProgressData, ReactVideoProps, VideoRef } from "react-native-video";
+import Video, { OnProgressData, ReactVideoProps, SubtitleStyle, VideoRef } from "react-native-video";
 import PlayerControls, { PlayerControlsRef } from "./PlayerControls";
 import { PlayerControllerProps, usePlayerController } from "../hooks/usePlayerController";
 import { Languages, setLanguage } from "../libs/localization";
+import { useResponsiveSize, useResponsiveVars } from "../hooks/useResponsiveSize";
 import { View } from "./styled";
 import { CNPLogger } from "../utils/logger";
 import clsx from "clsx";
@@ -20,6 +21,12 @@ export type VideoPlayerProps = {
 	playerConfig: Omit<PlayerControllerProps, "playerViewRef" | "videoRef" | "controlsRef">;
 	viewStyle?: StyleProp<ViewStyle>;
 	videoStyle?: StyleProp<ViewStyle>;
+	/**
+	 * Native subtitle rendering style (Android/iOS). Merged over a responsive default
+	 * (`fontSize` from the active size tokens, TV-scaled). A zero/undefined font size can
+	 * make native subtitles invisible, hence the explicit default.
+	 */
+	subtitleStyle?: SubtitleStyle;
 	theme?: SliderThemeType;
 	onClosePlayer?: () => void;
 	onNextVideo?: () => void;
@@ -50,6 +57,7 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 		playerConfig,
 		viewStyle,
 		videoStyle,
+		subtitleStyle,
 		nextLabel,
 		theme,
 		// Callbacks
@@ -65,6 +73,12 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 	const controlsRef = React.useRef<PlayerControlsRef>(null);
 	const playerViewRef = React.useRef<RNView>(null);
 	const [controlsVisible, setControlsVisible] = React.useState(true);
+
+	// Injects the responsive CSS variables (scaled by the TV pixel-ratio) onto the player root so
+	// every `var(--...)` in styles.css resolves on native — otherwise the whole control layout
+	// collapses because `.responsive-vars` is never mounted by a host on native.
+	const responsiveVars = useResponsiveVars();
+	const sizes = useResponsiveSize();
 
 	// Initialize player controller
 	const { nativeVideoProps, playerState, playbackResources, controls } = usePlayerController({
@@ -140,9 +154,9 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 	return (
 		<View
 			id={"video-player"}
-			className={clsx("video-player", controlsVisible && "video-controls-on")}
+			className={clsx("video-player responsive-vars", controlsVisible && "video-controls-on")}
 			ref={playerViewRef}
-			style={viewStyle}
+			style={[responsiveVars, viewStyle]}
 			onPointerMove={handlePointerActivity}
 			onTouchStart={handlePointerActivity}
 		>
@@ -155,6 +169,7 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 				preventsDisplaySleepDuringVideoPlayback={false}
 				style={[{ width: "100%", height: "auto", margin: "auto" }, videoStyle]}
 				resizeMode={"contain"}
+				subtitleStyle={{ fontSize: sizes.span1, ...subtitleStyle }}
 				{...videoProps}
 				controls={false}
 				paused={playerState.paused}

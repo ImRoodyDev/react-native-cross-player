@@ -5,9 +5,10 @@ import { OnLoadData, OnProgressData } from "react-native-video";
 import { Action, State, useComponentStateReducer } from "../hooks/useComponentState";
 import Animated, { Easing, useSharedValue, withTiming, ZoomIn } from "react-native-reanimated";
 import useWebKeyboard from "../hooks/useWebKeyboard";
+import useTVRemote from "../hooks/useTVRemote";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useResponsiveSize } from "../hooks/useResponsiveSize";
-import { Platform } from "react-native";
+import { Platform, StyleSheet } from "react-native";
 import { View, Text, SafeAreaView, AnimatedView } from "./styled";
 import Button from "./Button";
 import { sky, zinc } from "tailwindcss/colors";
@@ -42,6 +43,24 @@ export type PlayerControlsRef = {
 	state: Readonly<State>;
 };
 
+/**
+ * Shared styling for every control-bar button (play, seek, mute, menus, close, ...).
+ * Keeps the visual identity in ONE place instead of repeating the same 7 props per button;
+ * any prop can still be overridden per-usage since {...props} spreads last.
+ */
+const ControlButton = (props: React.ComponentProps<typeof Button>) => (
+	<Button
+		borderRadius={999999}
+		textColor="white"
+		focusedTextColor="white"
+		pressedScale={0.9}
+		backgroundColor={"transparent"}
+		selectedBackgroundColor={zinc[700]}
+		pressedBackgroundColor={zinc[600]}
+		{...props}
+	/>
+);
+
 const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControlsRef>) => {
 	// Destructuring props
 	const { visibilityDuration = 3000, theme } = props;
@@ -62,7 +81,8 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 	// Shared values for the slider
 	const [triggeredDropdown, setTriggeredDropdown] = React.useState(-1);
 	const [state, dispatch] = useComponentStateReducer({ type: "loading", message: t("PREPARING") });
-	const [_, setControlVisibility] = React.useState(true);
+	const [controlsVisible, setControlVisibility] = React.useState(true);
+	const controlsVisibleRef = useRef(true);
 
 	// FIX 1: Use ref to track latest values in timeout
 	const latestValuesRef = useRef({
@@ -78,6 +98,7 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 		}
 
 		visibilityOpacity.value = withTiming(0, { duration: 500, easing: Easing.ease });
+		controlsVisibleRef.current = false;
 		setControlVisibility(false);
 		props.onControlsVisibilityChange?.(false);
 	}, [props.onControlsVisibilityChange]);
@@ -87,7 +108,8 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 			clearTimeout(visibilityTimeoutRef.current);
 		}
 
-		// Make controls visible
+		// Make controls visible (and interactive/focusable)
+		controlsVisibleRef.current = true;
 		setControlVisibility(true);
 		props.onControlsVisibilityChange?.(true);
 		visibilityOpacity.value = withTiming(1, { duration: 500, easing: Easing.ease });
@@ -95,6 +117,18 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 		// Schedule hide with proper cleanup
 		visibilityTimeoutRef.current = setTimeout(hideControls, visibilityDuration);
 	}, [state.type, props.onControlsVisibilityChange, visibilityDuration, hideControls]);
+	// "Peek": briefly reveal the scrubber/overlay WITHOUT entering interactive/focus mode. Used by the
+	// TV remote while seeking so repeated Left/Right keeps seeking (controlsVisibleRef stays false)
+	// instead of flipping into button navigation after the first press.
+	const peekScrubber = useCallback(() => {
+		if (visibilityTimeoutRef.current) {
+			clearTimeout(visibilityTimeoutRef.current);
+		}
+		visibilityOpacity.value = withTiming(1, { duration: 200, easing: Easing.ease });
+		props.onControlsVisibilityChange?.(true);
+		visibilityTimeoutRef.current = setTimeout(hideControls, visibilityDuration);
+	}, [hideControls, visibilityDuration, props.onControlsVisibilityChange]);
+
 	const closeDropdown = useCallback(() => {
 		setTriggeredDropdown(-1);
 		showControls(); // Restart timeout when dropdown closes
@@ -187,6 +221,47 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 		f: toggleFullscreen
 	});
 
+	// Map TV remote / D-pad events (no-op off-TV).
+	useTVRemote(
+		{
+			up: showControls,
+			down: showControls,
+			menu: showControls,
+			longSelect: showControls,
+			playPause: togglePlay,
+			select: () => {
+				if (!controlsVisibleRef.current) showControls();
+			},
+			left: () => {
+				if (controlsVisibleRef.current) {
+					showControls(); // keep controls awake; let native focus handle the move
+					return;
+				}
+				seekBackward();
+				peekScrubber();
+			},
+			right: () => {
+				if (controlsVisibleRef.current) {
+					showControls();
+					return;
+				}
+				seekForward();
+				peekScrubber();
+			},
+			rewind: () => {
+				seekBackward();
+				if (controlsVisibleRef.current) showControls();
+				else peekScrubber();
+			},
+			fastForward: () => {
+				seekForward();
+				if (controlsVisibleRef.current) showControls();
+				else peekScrubber();
+			}
+		},
+		Platform.isTV
+	);
+
 	const safeStyle = useMemo(
 		() => ({
 			paddingTop: insets.top,
@@ -196,21 +271,15 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 	);
 
 	return (
-		<SafeAreaView className="player-controls" style={[safeStyle]} onPointerMove={showControls} onTouchStart={showControls}>
-			<AnimatedView className={"player-controls-ctn"} style={{ opacity: visibilityOpacity }}>
+		<SafeAreaView className="player-controls !absolute !inset-0 !z-50" style={[safeStyle]} onPointerMove={showControls} onTouchStart={showControls}>
+			<AnimatedView className={"player-controls-ctn"} style={{ opacity: visibilityOpacity }} pointerEvents={controlsVisible ? "auto" : "none"}>
 				<View className={"player-header"}>
-					<Button
+					<ControlButton
 						onPress={props.onClosePlayer}
 						icon="xmark"
 						className={`close-btn`}
 						iconSize={sizes.span2}
-						borderRadius={999999}
-						focusedTextColor="white"
-						textColor="white"
-						pressedScale={0.9}
 						backgroundColor={"#0000005f"}
-						selectedBackgroundColor={zinc[700]}
-						pressedBackgroundColor={zinc[600]}
 						style={{
 							outlineColor: "white",
 							outlineStyle: "solid",
@@ -219,6 +288,7 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 					/>
 					<Text className={"only-landscape player-title"}>{props.videoTitle}</Text>
 				</View>
+
 				<View className={"player-actions"}>
 					{state.type !== "idle" && (
 						<View className={"player-status-overlay"}>
@@ -320,78 +390,39 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 					/>
 				</View>
 				<View className={"player-buttons"}>
-					<Button
-						onPress={togglePlay}
-						icon={!props.playerState.paused ? "pause" : "play"}
-						className={`player-button`}
-						iconSize={defaultIconSize}
-						borderRadius={999999}
-						textColor="white"
-						focusedTextColor="white"
-						pressedScale={0.9}
-						backgroundColor={"transparent"}
-						selectedBackgroundColor={zinc[700]}
-						pressedBackgroundColor={zinc[600]}
-					/>
+					<ControlButton onPress={togglePlay} icon={!props.playerState.paused ? "pause" : "play"} className={`player-button`} iconSize={defaultIconSize} />
 
-					<Button
-						hideAndDisable={props.playerState.isLive} // Hide and disable seek buttons for live streams
+					{/* Seek buttons are hidden and disabled for live streams */}
+					<ControlButton
+						hideAndDisable={props.playerState.isLive}
 						onPress={seekBackward}
 						icon="backward_10_seconds"
 						className={`only-landscape player-button`}
 						iconSize={defaultIconSize}
-						borderRadius={999999}
-						textColor="white"
-						focusedTextColor="white"
-						pressedScale={0.9}
-						backgroundColor={"transparent"}
-						selectedBackgroundColor={zinc[700]}
-						pressedBackgroundColor={zinc[600]}
 					/>
 
-					<Button
-						hideAndDisable={props.playerState.isLive} // Hide and disable seek buttons for live streams
+					<ControlButton
+						hideAndDisable={props.playerState.isLive}
 						onPress={seekForward}
 						icon="forward_10_seconds"
 						className={`only-landscape player-button`}
 						iconSize={defaultIconSize}
-						borderRadius={999999}
-						textColor="white"
-						focusedTextColor="white"
-						pressedScale={0.9}
-						backgroundColor={"transparent"}
-						selectedBackgroundColor={zinc[700]}
-						pressedBackgroundColor={zinc[600]}
 					/>
 
-					<Button
+					<ControlButton
 						onPress={toggleMute}
 						icon={props.playerState.volume == 0 ? "volume_slash" : "volume_high"}
 						className={`only-landscape player-button`}
 						iconSize={defaultIconSize}
-						borderRadius={999999}
-						textColor="white"
-						focusedTextColor="white"
-						pressedScale={0.9}
-						backgroundColor={"transparent"}
-						selectedBackgroundColor={zinc[700]}
-						pressedBackgroundColor={zinc[600]}
 					/>
 
 					{props.onNextVideo && (
-						<Button
+						<ControlButton
 							onPress={props.onNextVideo}
 							icon={"next"}
 							text={props.nextLabel || t("NEXT_VIDEO")}
 							className={"only-landscape player-button next-button"}
 							iconSize={defaultIconSize}
-							borderRadius={999999}
-							textColor="white"
-							focusedTextColor="white"
-							pressedScale={0.9}
-							backgroundColor={"transparent"}
-							selectedBackgroundColor={zinc[700]}
-							pressedBackgroundColor={zinc[600]}
 						/>
 					)}
 
@@ -399,94 +430,47 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 
 					<View className={"player-buttons-separator"} />
 
-					<Button
+					<ControlButton
 						onPress={() => openDropdown(4)}
 						icon="speed"
 						className={`player-button only-landscape`}
 						iconSize={defaultIconSize - 4}
-						borderRadius={999999}
-						textColor="white"
-						focusedTextColor="white"
-						pressedScale={0.9}
-						backgroundColor={"transparent"}
-						selectedBackgroundColor={zinc[700]}
-						pressedBackgroundColor={zinc[600]}
 						{...((props.resources.rates.length < 1 || props.playerState.isLive) && { style: { display: "none" } })}
 					/>
 
-					<Button
-						onPress={() => openDropdown(0)}
-						icon="globe"
-						className={`player-button`}
-						iconSize={defaultIconSize}
-						borderRadius={999999}
-						textColor="white"
-						focusedTextColor="white"
-						pressedScale={0.9}
-						backgroundColor={"transparent"}
-						selectedBackgroundColor={zinc[700]}
-						pressedBackgroundColor={zinc[600]}
-					/>
+					<ControlButton onPress={() => openDropdown(0)} icon="globe" className={`player-button`} iconSize={defaultIconSize} />
 
 					{/* Audio track button — hidden when there is only one (or zero) audio tracks */}
-					<Button
+					<ControlButton
 						onPress={() => openDropdown(3)}
 						icon="audio_wave"
 						className={`player-button`}
 						iconSize={defaultIconSize}
-						borderRadius={999999}
-						textColor="white"
-						focusedTextColor="white"
-						pressedScale={0.9}
-						backgroundColor={"transparent"}
-						selectedBackgroundColor={zinc[700]}
-						pressedBackgroundColor={zinc[600]}
 						{...(props.resources.audioTracks.length <= 1 && { style: { display: "none" } })}
 					/>
 
-					<Button
+					<ControlButton
 						onPress={() => openDropdown(1)}
 						icon="subtitle"
 						className={`player-button`}
 						iconSize={defaultIconSize}
-						borderRadius={999999}
-						textColor="white"
-						focusedTextColor="white"
-						pressedScale={0.9}
-						backgroundColor={"transparent"}
-						selectedBackgroundColor={zinc[700]}
-						pressedBackgroundColor={zinc[600]}
 						{...(props.resources.subtitles.length === 0 && { style: { display: "none" } })}
 					/>
 
-					<Button
+					<ControlButton
 						onPress={() => openDropdown(2)}
 						icon="settings"
 						className={`player-button`}
 						iconSize={defaultIconSize}
-						borderRadius={999999}
-						textColor="white"
-						focusedTextColor="white"
-						pressedScale={0.9}
-						backgroundColor={"transparent"}
-						selectedBackgroundColor={zinc[700]}
-						pressedBackgroundColor={zinc[600]}
 						{...(props.resources.levels.length === 0 && { style: { display: "none" } })}
 					/>
 
 					{Platform.OS === "web" && (
-						<Button
+						<ControlButton
 							onPress={toggleFullscreen}
 							icon={props.playerState.isFullscreen ? "compress" : "expand"}
 							className={`player-button`}
 							iconSize={defaultIconSize}
-							borderRadius={999999}
-							textColor="white"
-							focusedTextColor="white"
-							pressedScale={0.9}
-							backgroundColor={"transparent"}
-							selectedBackgroundColor={zinc[700]}
-							pressedBackgroundColor={zinc[600]}
 						/>
 					)}
 				</View>
