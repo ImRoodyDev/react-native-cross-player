@@ -58,23 +58,47 @@ export function useSources(params: UseSourcesParams) {
 
 	const addSubtitleSource = useCallback(
 		async (subtitle: SubtitleSource) => {
-			if (subtitle.options && !subtitle.options.overrideProxyURL) subtitle.options.overrideProxyURL = proxyURL;
+			const subtitleOptions = subtitle.options
+				? {
+						...subtitle.options,
+						overrideProxyURL: subtitle.options.overrideProxyURL || proxyURL
+					}
+				: subtitle.options;
 
-			if (proxyResolver && subtitle.options?.useProxy) subtitle.source = proxyResolver(subtitle.source, proxyURL || "", subtitle.options?.headers || {});
+			// Idempotency: reuse an already-created blob for this id instead of minting a second one.
+			// The player init effect can run more than once: the consumer often passes an inline
+			// subtitleSources array (new identity every render) and React StrictMode double-invokes
+			// effects in dev, so without this we'd create duplicate VTT blobs for the same subtitle.
+			// `subtitle` is never mutated, so `subtitle.source` is always the pristine URL from props.
+			const existing = createdSubtitlesRef.current.get(subtitle.id);
+			const createdSubtitle = existing?.source
+				? existing
+				: ({
+						...subtitle,
+						options: subtitleOptions,
+						source: await createVTTSource({ ...subtitle, options: subtitleOptions }, proxyResolver).catch(() => "")
+					} satisfies SubtitleSource);
 
-			const source = await createVTTSource(subtitle, proxyResolver).catch(() => "");
-			subtitle.source = source;
-			createdSubtitlesRef.current.set(subtitle.id, subtitle);
+			createdSubtitlesRef.current.set(subtitle.id, createdSubtitle);
 
-			if (Platform.OS === "web" && videoRef?.current?.nativeHtmlVideoRef?.current && subtitle.source) {
-				videoRef.current.nativeHtmlVideoRef.current.appendChild(
+			if (Platform.OS === "web" && videoRef?.current?.nativeHtmlVideoRef?.current && createdSubtitle.source) {
+				const videoEl = videoRef.current.nativeHtmlVideoRef.current;
+
+				// Remove any <track> already attached for this id before appending. Appending without
+				// this produced duplicate <track> elements (same id, different blob) and doubled
+				// subtitle lines on web. Iterate a static copy since we mutate the DOM while looping.
+				Array.from(videoEl.querySelectorAll("track")).forEach((track) => {
+					if (track.id === createdSubtitle.id) videoEl.removeChild(track);
+				});
+
+				videoEl.appendChild(
 					Object.assign(document.createElement("track"), {
 						kind: "subtitles",
-						label: subtitle.label || subtitle.langISO,
-						src: subtitle.source,
-						srclang: subtitle.langISO,
+						label: createdSubtitle.label || createdSubtitle.langISO,
+						src: createdSubtitle.source,
+						srclang: createdSubtitle.langISO,
 						default: false,
-						id: subtitle.id
+						id: createdSubtitle.id
 					})
 				);
 			}
@@ -100,6 +124,8 @@ export function useSources(params: UseSourcesParams) {
 			setInitializedSubtitle(false);
 			return;
 		}
+		// Lazy: create each subtitle's file only when first selected (like videos). A first selection
+		// may make media3 re-prepare and restart — the controller's resume logic seeks back.
 		if (!lazyLoadSources) {
 			for (const subtitle of subtitleSources) await addSubtitleSource(subtitle);
 		}

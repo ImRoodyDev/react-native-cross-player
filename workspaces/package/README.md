@@ -191,12 +191,33 @@ export function CustomPlayer() {
 }
 ```
 
+## TV Support
+
+The player has first-class Android TV / tvOS support (requires `react-native-tvos`):
+
+- **Remote / D-pad handling** is built in via the exported `useTVRemote` hook (a no-op off-TV):
+  - **Controls hidden ("watch mode"):** `Left`/`Right` seek ±10s and briefly reveal the scrubber without grabbing focus (so repeated presses keep seeking); `Up`/`Down`/`OK`/`Menu` reopen the full, focusable controls; `Play/Pause` toggles playback.
+  - **Controls visible ("focus mode"):** `Left`/`Right`/`Up`/`Down` fall through to native D-pad focus navigation between the buttons; the dedicated `Play/Pause` / `FastForward` / `Rewind` keys still work.
+  - When hidden, the controls overlay drops `pointerEvents`, so it never traps TV focus on invisible buttons.
+- **Responsive TV scaling:** the player root injects its size tokens as CSS variables (via NativeWind `vars()`), scaled by a pixel-ratio factor derived from the window width relative to a 1920px reference (clamped 0.4–1.1). Breakpoints: `mobile ≤ 599px`, `mobile_landscape ≤ 1023×479`, `tablet ≤ 899px`, `default` otherwise. Use the exported `useResponsiveSize()` (numeric, TV-scaled tokens) and `useResponsiveVars()` (CSS vars) hooks if you build custom UI on top.
+- **D-pad reachability:** the bottom control cluster is wrapped in the exported `FocusGuide` component (a `TVFocusGuideView` on TV, plain `View` elsewhere) so focus can always travel from top overlays to the play/seek/menu row across the non-focusable gesture area. Reuse `FocusGuide` around your own overlay buttons if they become unreachable.
+
+## Subtitles
+
+- **Web:** subtitle files are fetched, converted to WebVTT if needed (SRT supported), stored as `blob:` URLs and attached to the `<video>` element as `<track>` elements. Attachment is idempotent — re-adding the same subtitle id replaces its track instead of duplicating it.
+- **Native (Android/iOS):** subtitles are fetched, converted to WebVTT if needed and written to a local cache file, which is passed to react-native-video via `source.textTracks`; entries not yet created (lazy loading) are declared by their raw remote URL so they exist at prepare time.
+- **Tracks are declared up front:** all subtitles are included in `source.textTracks` on the first load (even with `lazyLoadSources`) because ExoPlayer only reads them when preparing the source — tracks added later to an unchanged `uri` never arrive. Switching subtitles only changes `selectedTextTrack`, so there is no reload/flicker. Tracks are never attached to an empty source (no `uri`) — doing so crashes media3 with an NPE.
+- **Version note:** the react-native-video peer dependency is bounded to `>=6.0.0 <=6.14.1` — later 6.x releases (observed on 6.19.x) regressed side-loaded text track handling, preventing subtitles from rendering.
+- **Native track selection is title-based:** each side-loaded track's `title` is set to its subtitle id and selection uses `selectedTextTrack: { type: 'title', value: <id> }` — index-based selection doesn't reliably match ExoPlayer's internal track order ([react-native-video#2349](https://github.com/TheWidlarzGroup/react-native-video/issues/2349)).
+- **Subtitle styling:** `VideoPlayer` passes a responsive default `fontSize` via react-native-video's `subtitleStyle` (some Android devices otherwise render subtitles invisibly small). Override it with the `subtitleStyle` prop.
+- **Debugging:** the controller logs the tracks the native player actually discovered (`onTextTracks`) — check that log first when a subtitle doesn't render.
+
 ## Public exports
 
 The package entry exports more than the ready-made components:
 
 - UI: `VideoPlayer`, `PlayerControls`, `VideoPlayerRef`, `PlayerControlsRef`, `ControlsProps`.
-- Controller hooks: `usePlayerController`, `PlayerControllerProps`, `useWebKeyboard`.
+- Controller hooks: `usePlayerController`, `PlayerControllerProps`, `useWebKeyboard`, `useTVRemote`, `useResponsiveSize`, `useResponsiveVars`.
 - Media helpers: `createM3U8Source`, `createMasterM3U8Raw`, `createVTTSource`, `convertSRTtoVTT`, `createM3U8File`, `createVTTFile`, `clearBlobFiles`, `clearBlobGroup`, `revokeAllBlobURLs`.
 - HLS/proxy helpers: `HlsProxy`, `HlsProxyManager`, `ProxyLoader`, `ProxyPlaylistLoader`, `ProxyFragmentLoader`, `HlsProxyConfig`, `ProxyURLResolverCallback`.
 - Types: `VideoSource`, `SubtitleSource`, `SourceRequestOptions`, `M3U8BlobOptions`, `M3U8PlaylistTrack`, `M38USubtitleTrack`, `M3U8AudioTrack`, `SubtitleBlobOptions`, `SourceTypes`, `SubtitleTypes`, `TextEncoding`, `VideoFormats`.

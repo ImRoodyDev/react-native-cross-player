@@ -6,7 +6,11 @@ This file documents the public API of react-native-cross-player. It's extracted 
 
 - `VideoPlayer` (component) — in `src/ui/VideoPlayer`
 - `PlayerControls` (component) — in `src/ui/PlayerControls`
+- `FocusGuide` (component) — in `src/ui/FocusGuide`; `TVFocusGuideView` on TV, plain `View` elsewhere. Wrap overlay clusters that D-pad focus can't reach across non-focusable areas (style must be inline — TVFocusGuideView doesn't reliably support className).
 - `usePlayerController` (hook) — in `src/hooks/usePlayerController`
+- `useTVRemote` (hook) — in `src/hooks/useTVRemote`
+- `useResponsiveSize` / `useResponsiveVars` (hooks) — in `src/hooks/useResponsiveSize`
+- `useWebKeyboard` (hook) — in `src/hooks/useWebKeyboard`
 - `HlsProxy` and controllers — in `src/controllers`
 - Utility libs and types — in `src/libs` and `src/types`
 
@@ -88,6 +92,22 @@ See `src/hooks/usePlayerController.ts` for full typings and runtime options. Key
 - `playerState` now includes an `isLive: boolean` flag that indicates whether the loaded media is a live stream (HLS live playlist or a source with no finite duration).
 - Supports `initialVideoSource`, `initialSubtitleSource`, and `initialAudioTrack` (audio applied after media load).
 - Accepts `maxResolutionHeight` to help filter or prefer quality levels when building level lists.
+- The initialization effect is keyed on the **content** of `videoSources`/`subtitleSources` (their ids), not array identity — passing inline arrays from a parent that re-renders (e.g. on progress/visibility updates) does not re-initialize the player.
+- On native, side-loaded subtitles are exposed to react-native-video as `source.textTracks` built from each subtitle's created local VTT file (raw remote URL for entries not yet created). Selection uses `selectedTextTrack: { type: 'title' }` matched against the track title (set to the subtitle id) — index-based selection is unreliable on Android (react-native-video#2349). See "Notes on subtitles" below.
+
+## `useTVRemote` (hook)
+
+`useTVRemote(handlers, enabled?)` — subscribe to TV remote / D-pad key events. No-op outside TV platforms (requires `react-native-tvos`, which exposes `TVEventHandler.addListener`).
+
+- `handlers`: partial map of `up | down | left | right | select | longSelect | playPause | fastForward | rewind | menu` to callbacks, plus an optional `any(event)` fired before each handled event (useful to reset auto-hide timers).
+- Fires once per physical press (skips Android's key-down half; Android only dispatches key-up by default).
+- Handlers are read through a ref — passing a fresh object every render is fine and does not resubscribe.
+
+## `useResponsiveSize` / `useResponsiveVars` (hooks)
+
+- Breakpoints: `mobile ≤ 599px`, `mobile_landscape ≤ 1023×479`, `tablet ≤ 899px`, `default` otherwise.
+- `useResponsiveSize()` returns the active numeric size tokens, multiplied by the TV pixel-ratio scale (`window width / 1920`, clamped 0.4–1.1) on TV.
+- `useResponsiveVars()` returns the same tokens as NativeWind CSS variables (`--side-padding`, `--h1-size`, …, plus `--pixel-ratio`); `VideoPlayer` applies these on its root so the stylesheet resolves on native.
 
 ## `HlsProxy` and HLS helpers
 
@@ -144,6 +164,11 @@ See `src/hooks/usePlayerController.ts` for full typings and runtime options. Key
     <td><code>videoStyle?</code></td>
     <td><code>StyleProp&lt;ViewStyle&gt;</code></td>
     <td>Style applied to the rendered video element.</td>
+  </tr>
+  <tr>
+    <td><code>subtitleStyle?</code></td>
+    <td><code>SubtitleStyle</code></td>
+    <td>Native subtitle rendering style (Android/iOS), merged over a responsive default <code>fontSize</code> (TV-scaled). Without an explicit font size some Android devices render side-loaded subtitles invisibly small.</td>
   </tr>
   <tr>
     <td><code>theme?</code></td>
@@ -251,6 +276,15 @@ See `src/hooks/usePlayerController.ts` for full typings and runtime options. Key
   </tr>
 </tbody>
 </table>
+
+## Notes on subtitles
+
+- **Web:** subtitles are converted to WebVTT (SRT → VTT supported), stored as `blob:` URLs and attached as `<track>` elements on the `<video>`. Attachment is idempotent per subtitle id (re-adding replaces the existing track).
+- **Native:** subtitles are fetched, converted to WebVTT if needed and written to a local cache file which is declared in `source.textTracks` (`text/vtt`, or `application/x-subrip` for raw remote SRT). Requires react-native-video `>=6.0.0 <=6.14.1` — later 6.x releases (observed on 6.19.x) regressed side-loaded track handling.
+- **All subtitles are declared in `source.textTracks` up front** (on the first load), regardless of `lazyLoadSources`: ExoPlayer only reads `textTracks` when it (re)prepares the source, so tracks merged in later — with an unchanged `uri` — never arrive. Not-yet-created entries are declared by their raw remote URL. Switching subtitles only flips `selectedTextTrack`; the source is never rebuilt for subtitles. Tracks are never attached to a source without a `uri` (media3 NPE).
+- Native track selection is **title-based** (`selectedTextTrack: { type: 'title', value: <subtitle id> }`; each track's `title` is set to its subtitle id). Index-based selection does not reliably match ExoPlayer's internal track order (react-native-video#2349).
+- The controller subscribes to `onTextTracks` and logs the tracks the native player actually discovered (`index`/`title`/`language`/`selected`) via `CNPLogger` — the first thing to check when a subtitle doesn't render: if the track is missing, the `textTracks` wiring failed; if present but `selected: false`, the selection didn't match.
+- `VideoPlayer` always passes a `subtitleStyle` with a responsive `fontSize` (overridable via the `subtitleStyle` prop) so native subtitles are never rendered at an invisible size.
 
 ## Notes on audio tracks
 

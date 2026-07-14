@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect } from "react";
+import { forwardRef, memo, useCallback, useEffect, useImperativeHandle } from "react";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { Easing, useSharedValue, withDelay, withSequence, withSpring, withTiming } from "react-native-reanimated";
 
@@ -18,8 +18,12 @@ type Props = {
 const AnimationDuration = 300;
 const ResetDelay = 200;
 
-function PlayerGesture(props: Props) {
-	const sizes = useResponsiveSize();
+export type PlayerGestureRef = {
+	animateTouch: () => void;
+};
+
+const PlayerGesture = forwardRef<PlayerGestureRef, Props>((props, ref) => {
+	const { h1 } = useResponsiveSize();
 	const animatedOpacity = useSharedValue(1); // Starts visible
 	const animatedScale = useSharedValue(1); // Starts at normal scale
 
@@ -37,6 +41,8 @@ function PlayerGesture(props: Props) {
 	}, [props.autoHide]);
 
 	const animateTouch = useCallback(() => {
+		if (props.disable) return;
+
 		// Show then auto-hide
 		animatedOpacity.value = withSequence(
 			withTiming(1, { duration: AnimationDuration, easing: Easing.ease }),
@@ -44,7 +50,7 @@ function PlayerGesture(props: Props) {
 		);
 
 		animatedScale.value = withSequence(withSpring(1), withDelay(ResetDelay, withTiming(0, { duration: AnimationDuration, easing: Easing.in(Easing.ease) })));
-	}, [props.autoHide]);
+	}, [props.autoHide, props.disable]);
 
 	const doubleTap = Gesture.Tap()
 		.numberOfTaps(props.tap || 2)
@@ -52,6 +58,10 @@ function PlayerGesture(props: Props) {
 			props.onPress();
 			animateTouch();
 		});
+
+	useImperativeHandle(ref, () => ({
+		animateTouch
+	}));
 
 	if (props.disable) return null;
 
@@ -68,11 +78,11 @@ function PlayerGesture(props: Props) {
 						]}
 						className={"player-gesture-icon"}
 					/>
-					<AnimatedView style={{ opacity: animatedOpacity }}>{Icons[props.icon]({ color: "white", size: sizes.h1 })}</AnimatedView>
+					<AnimatedView style={{ opacity: animatedOpacity }}>{Icons[props.icon]({ color: "white", size: h1 })}</AnimatedView>
 				</View>
 			</GestureDetector>
 		</View>
 	);
-}
+});
 
 export default memo(PlayerGesture);

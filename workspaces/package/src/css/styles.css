@@ -203,6 +203,11 @@
 	margin-right: auto;
 }
 
+.player-dropdown-scroll-ptn {
+	width: 100%;
+	height: 100%;
+}
+
 .player-dropdown-scroll {
 	width: 100%;
 	height: 100%;
@@ -305,8 +310,8 @@
 	max-width: 40vw;
 	color: white;
 	margin-top: var(--span1b-size);
-	font-size: var(--span2-size);
-	font-family: "Montserrat-Regular", serif;
+	font-size: var(--h3-size);
+	font-family: "Montserrat-SemiBold", serif;
 	text-align: center;
 }
 
@@ -344,6 +349,7 @@
 .player-controls {
 	width: 100%;
 	height: 100%;
+	z-index: 1000;
 }
 
 .player-controls-ctn {
@@ -358,6 +364,10 @@
 }
 
 .player-header {
+	width: 100%;
+	height: auto;
+}
+.player-header-ctn {
 	width: 100%;
 	height: auto;
 
@@ -427,6 +437,11 @@
 .player-buttons {
 	width: 100%;
 	height: auto;
+}
+
+.player-buttons-ctn {
+	width: 100%;
+	height: auto;
 
 	display: flex;
 	flex-direction: row;
@@ -449,9 +464,8 @@
 }
 
 .next-button {
-	width: auto !important;
 	height: calc(var(--h1-size) * 1.1) !important;
-	aspect-ratio: calc(2.8125 * (var(--h1-size) * 1.1)) !important;
+	width: calc(var(--h1-size) * 1.1 * 2.81 + var(--span3-size) * 2) !important;
 	padding-left: var(--span3-size) !important;
 	padding-right: var(--span3-size) !important;
 	padding-top: 0 !important;

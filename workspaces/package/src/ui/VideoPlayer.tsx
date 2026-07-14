@@ -1,9 +1,9 @@
 "use client";
 
-import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect } from "react";
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo } from "react";
 import { Platform, StatusBar, StyleProp, View as RNView, ViewStyle } from "react-native";
 import Video, { OnProgressData, ReactVideoProps, SubtitleStyle, VideoRef } from "react-native-video";
-import PlayerControls, { PlayerControlsRef } from "./PlayerControls";
+import PlayerControls, { ControlsProps, PlayerControlsRef } from "./PlayerControls";
 import { PlayerControllerProps, usePlayerController } from "../hooks/usePlayerController";
 import { Languages, setLanguage } from "../libs/localization";
 import { useResponsiveSize, useResponsiveVars } from "../hooks/useResponsiveSize";
@@ -36,7 +36,7 @@ export type VideoPlayerProps = {
 	onPlaybackChange?: (isPlaying: boolean) => void;
 	onProgress?: (currentTime: number) => void;
 	onEnd?: () => void;
-};
+} & Pick<ControlsProps, "HeaderRightElement" | "visibilityDuration">;
 
 export type VideoPlayerRef = {
 	setState: (state: State) => void;
@@ -60,6 +60,9 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 		subtitleStyle,
 		nextLabel,
 		theme,
+		HeaderRightElement,
+		visibilityDuration,
+
 		// Callbacks
 		onNextVideo,
 		onControlVisibilityChange,
@@ -78,7 +81,7 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 	// every `var(--...)` in styles.css resolves on native — otherwise the whole control layout
 	// collapses because `.responsive-vars` is never mounted by a host on native.
 	const responsiveVars = useResponsiveVars();
-	const sizes = useResponsiveSize();
+	const { h4 } = useResponsiveSize();
 
 	// Initialize player controller
 	const { nativeVideoProps, playerState, playbackResources, controls } = usePlayerController({
@@ -88,17 +91,33 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 		...playerConfig
 	});
 
-	const videoProps: ReactVideoProps = {
-		...(nativeVideoProps || {}),
-		onProgress: (event: OnProgressData) => {
+	// Memoized: <Video> re-diffs (and re-sends) its props whenever handler identities change, so
+	// the wrapper object and its callbacks must stay stable across unrelated re-renders.
+	const handleProgress = useCallback(
+		(event: OnProgressData) => {
 			nativeVideoProps?.onProgress?.(event);
 			onProgress?.(event.currentTime);
 		},
-		onEnd: () => {
-			nativeVideoProps?.onEnd?.();
-			onEnd?.();
-		}
-	};
+		[nativeVideoProps?.onProgress, onProgress]
+	);
+	const handleEnd = useCallback(() => {
+		nativeVideoProps?.onEnd?.();
+		onEnd?.();
+	}, [nativeVideoProps?.onEnd, onEnd]);
+
+	const videoProps: ReactVideoProps = useMemo(
+		() => ({
+			...(nativeVideoProps || {}),
+			onProgress: handleProgress,
+			onEnd: handleEnd
+		}),
+		[nativeVideoProps, handleProgress, handleEnd]
+	);
+
+	// Stable style/prop objects for the native video view (inline literals churn the prop diff).
+	const videoStyleMerged = useMemo(() => [{ width: "100%", height: "auto", margin: "auto" } as ViewStyle, videoStyle], [videoStyle]);
+	const subtitleStyleMerged = useMemo(() => ({ fontSize: h4, ...subtitleStyle }), [h4, subtitleStyle]);
+	const rootStyle = useMemo(() => [responsiveVars, viewStyle], [responsiveVars, viewStyle]);
 
 	// Callbacks for source and subtitle changes
 	useEffect(() => {
@@ -156,7 +175,7 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 			id={"video-player"}
 			className={clsx("video-player responsive-vars", controlsVisible && "video-controls-on")}
 			ref={playerViewRef}
-			style={[responsiveVars, viewStyle]}
+			style={rootStyle}
 			onPointerMove={handlePointerActivity}
 			onTouchStart={handlePointerActivity}
 		>
@@ -167,9 +186,9 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 				focusable={false}
 				disableDisconnectError={false}
 				preventsDisplaySleepDuringVideoPlayback={false}
-				style={[{ width: "100%", height: "auto", margin: "auto" }, videoStyle]}
 				resizeMode={"contain"}
-				subtitleStyle={{ fontSize: sizes.span1, ...subtitleStyle }}
+				style={videoStyleMerged}
+				subtitleStyle={subtitleStyleMerged}
 				{...videoProps}
 				controls={false}
 				paused={playerState.paused}
@@ -183,9 +202,11 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 				resources={playbackResources}
 				playerState={playerState}
 				nextLabel={nextLabel}
+				HeaderRightElement={HeaderRightElement}
 				onControlsVisibilityChange={setControlsVisible}
 				onClosePlayer={props.onClosePlayer}
 				onNextVideo={onNextVideo}
+				visibilityDuration={visibilityDuration}
 			/>
 		</View>
 	);

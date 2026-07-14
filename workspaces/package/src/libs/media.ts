@@ -555,6 +555,7 @@ export async function createVTTSource(trackSource: SubtitleSource, proxyResolver
 
 		let vttData = rawData;
 		if (type === "srt") vttData = convertSRTtoVTT(rawData);
+		else vttData = normalizeVTTContent(rawData);
 
 		const fileName = `${trackSource.id || trackSource.langISO || "subtitle"}.vtt`;
 		return await createVTTFile(vttData, fileName, trackSource.playerId, trackSource.playerId);
@@ -562,6 +563,13 @@ export async function createVTTSource(trackSource: SubtitleSource, proxyResolver
 		CNPLogger.error(`Failed to create VTT source for ${trackSource.source}: ${error instanceof Error ? error.message : String(error)}`);
 		throw error;
 	}
+}
+
+/**
+ * Normalize already-WebVTT content before writing it to a local file/blob.
+ */
+export function normalizeVTTContent(vttData: string): string {
+	return vttData.replace(/^\uFEFF/, "");
 }
 
 /**

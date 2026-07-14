@@ -29,7 +29,7 @@ type ComponentStatusProps = {
 };
 
 function ComponentStatus(props: ComponentStatusProps) {
-	const sizes = useResponsiveSize();
+	const { h1, span2 } = useResponsiveSize();
 
 	const textElement = useCallback(
 		(extra: string = "") => {
@@ -62,21 +62,21 @@ function ComponentStatus(props: ComponentStatusProps) {
 			<View className={"component-status-ctn"} style={[{ flexBasis: props.flexBasic }, Platform.OS !== "web" && { flexGrow: 1 }]}>
 				{props.state == "loading" && (
 					<View className="component-status-loading">
-						<Spinner size={sizes.h1 * 1.4} strokeWidth={3} />
+						<Spinner size={h1 * 1.2} strokeWidth={h1 * 0.1 + 1} />
 						{textElement("...")}
 					</View>
 				)}
 
 				{props.state == "succeed" && (
 					<View className="component-status-succeed">
-						<Icons.success className={"component-status-icon"} color={green["500"]} size={sizes.h1 * 1.3} />
+						<Icons.success className={"component-status-icon"} color={green["500"]} size={h1 * 1.3} />
 					</View>
 				)}
 
 				{props.state == "error" && (
 					<>
 						<View className="component-status-failed">
-							<Icons.danger className={"component-status-icon"} color={red["500"]} size={sizes.h1 * 1.3} />
+							<Icons.danger className={"component-status-icon"} color={red["500"]} size={h1 * 1.3} />
 						</View>
 						{textElement()}
 						{(props.enableOk || props.onOkPress) && (
@@ -87,7 +87,7 @@ function ComponentStatus(props: ComponentStatusProps) {
 								textClassName="component-status-btn-text"
 								icon={props.okIcon}
 								borderRadius={99999}
-								iconSize={sizes.span2}
+								iconSize={span2}
 								textColor={"black"}
 								backgroundColor={zinc[700]}
 								selectedBackgroundColor={zinc[600]}

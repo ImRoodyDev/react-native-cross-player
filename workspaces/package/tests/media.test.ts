@@ -1,10 +1,10 @@
 jest.mock("../src/libs/network");
 jest.mock("../src/utils/detectors");
 
-import { createM3U8Source, createMasterM3U8Raw } from "../src/libs/media";
-import { fetchSource } from "../src/libs/network";
-import { detectSourceType } from "../src/utils/detectors";
-import { M3U8AudioTrack, M3U8BlobOptions, SourceTypes, VideoSource } from "../src/types/media";
+import { createM3U8Source, createMasterM3U8Raw, createVTTSource } from "../src/libs/media";
+import { fetchSource, fetchSubtitleTrackRawData } from "../src/libs/network";
+import { detectSourceType, detectSubtitleType } from "../src/utils/detectors";
+import { M3U8BlobOptions, SourceTypes, SubtitleSource, VideoSource } from "../src/types/media";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { CNPLogger } from "../src/utils/logger";
@@ -14,8 +14,10 @@ import { Platform } from "react-native";
 CNPLogger.enableDebugging(true);
 
 const mockedFetchSource = fetchSource as jest.MockedFunction<typeof fetchSource>;
+const mockedFetchSubtitleTrackRawData = fetchSubtitleTrackRawData as jest.MockedFunction<typeof fetchSubtitleTrackRawData>;
 // We'll use the real `createM3U8File` implementation (jest config provides blob util mocks)
 const mockedDetectSourceType = detectSourceType as jest.MockedFunction<typeof detectSourceType>;
+const mockedDetectSubtitleType = detectSubtitleType as jest.MockedFunction<typeof detectSubtitleType>;
 
 describe("createM3U8File", () => {
 	beforeAll(async () => {
@@ -236,6 +238,38 @@ describe("createM3U8File", () => {
 		const audioPath = audioFile0!.startsWith("file://") ? audioFile0!.replace("file://", "") : audioFile0!;
 		const audioContent = await readFile(audioPath, "utf8");
 		expect(audioContent).toContain("http://proxy.example.com/https%3A%2F%2Fexample.com%2Faudio_en_seg1.aac");
+	});
+});
+
+describe("createVTTSource", () => {
+	beforeAll(async () => {
+		Platform.OS = "android";
+	});
+
+	beforeEach(() => {
+		jest.resetAllMocks();
+		mockedDetectSourceType.mockReturnValue(SourceTypes.URL);
+		mockedDetectSubtitleType.mockReturnValue("vtt");
+	});
+
+	test("strips a leading UTF-8 BOM from fetched VTT content", async () => {
+		const subtitle: SubtitleSource = {
+			id: "sub_bom",
+			playerId: "player_sub_bom",
+			source: "https://example.com/subtitles/en.vtt",
+			langISO: "en",
+			label: "English",
+			type: "vtt"
+		};
+
+		mockedFetchSubtitleTrackRawData.mockResolvedValue("\uFEFFWEBVTT\n\n00:00:01.000 --> 00:00:02.000\nHello");
+
+		const result = await createVTTSource(subtitle, (url) => url);
+		const filePath = result.startsWith("file://") ? result.replace("file://", "") : result;
+		const produced = await readFile(filePath, "utf8");
+
+		expect(produced.startsWith("\uFEFF")).toBe(false);
+		expect(produced.startsWith("WEBVTT")).toBe(true);
 	});
 });
 

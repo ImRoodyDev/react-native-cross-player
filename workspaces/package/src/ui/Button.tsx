@@ -7,6 +7,7 @@ import { ButtonAllowedStyle, CustomButton, CustomButtonProps, joinClsx, Pressabl
 // Internal imports
 import { Icons, IconType } from "../constants/icons";
 import { Text } from "./styled";
+import { useResponsiveSize } from "../hooks/useResponsiveSize";
 
 // Type definitions
 type ButtonProps = {
@@ -41,6 +42,7 @@ const Button = React.forwardRef((props: ButtonProps, ref?: Ref<RNView>) => {
 		focusOutlineColor = "white",
 		...baseButtonProps
 	} = props;
+	const { outlineWidth } = useResponsiveSize();
 
 	// Memoized style extraction to handle dynamic styles
 	const extractedStyle = useMemo((): PressableStyle => {
@@ -54,7 +56,7 @@ const Button = React.forwardRef((props: ButtonProps, ref?: Ref<RNView>) => {
 				borderRadius,
 				...(focused &&
 					focusOutlined && {
-						outlineWidth: 2,
+						outlineWidth: outlineWidth,
 						outlineOffset: 0,
 						outlineStyle: "solid",
 						outlineColor: focusOutlineColor

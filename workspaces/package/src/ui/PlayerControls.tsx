@@ -3,18 +3,19 @@
 import React, { forwardRef, memo, Ref, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from "react";
 import { OnLoadData, OnProgressData } from "react-native-video";
 import { Action, State, useComponentStateReducer } from "../hooks/useComponentState";
-import Animated, { Easing, useSharedValue, withTiming, ZoomIn } from "react-native-reanimated";
+import { Easing, useAnimatedStyle, useSharedValue, withTiming, ZoomIn } from "react-native-reanimated";
 import useWebKeyboard from "../hooks/useWebKeyboard";
 import useTVRemote from "../hooks/useTVRemote";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useResponsiveSize } from "../hooks/useResponsiveSize";
-import { Platform, StyleSheet } from "react-native";
+import { Platform, StyleSheet, View as RNView } from "react-native";
 import { View, Text, SafeAreaView, AnimatedView } from "./styled";
 import Button from "./Button";
 import { sky, zinc } from "tailwindcss/colors";
-import PlayerGesture from "./PlayerGesture";
+import PlayerGesture, { PlayerGestureRef } from "./PlayerGesture";
 import { t } from "../libs/localization";
 import ComponentStatus from "./ComponentStatus";
+import FocusGuide from "./FocusGuide";
 import PlayerDropdown from "./PlayerDropdown";
 import { Slider, SliderThemeType } from "react-native-awesome-slider";
 import { formatTime } from "../utils/helpers";
@@ -28,8 +29,12 @@ export type ControlsProps = {
 	controls: VideoControls;
 	playerState: PlayerState;
 	resources: PlaybackResources;
+	/** Visibility duration for the controls (milliseconds)
+	 * @default 3000
+	 */
 	visibilityDuration?: number;
 	theme?: SliderThemeType;
+	HeaderRightElement?: React.ReactNode;
 	onControlsVisibilityChange?: (visible: boolean) => void;
 	onClosePlayer?: () => void;
 	onNextVideo?: () => void;
@@ -47,9 +52,11 @@ export type PlayerControlsRef = {
  * Shared styling for every control-bar button (play, seek, mute, menus, close, ...).
  * Keeps the visual identity in ONE place instead of repeating the same 7 props per button;
  * any prop can still be overridden per-usage since {...props} spreads last.
+ * Forwards ref so buttons can be used as TV focus destinations (nextFocus*).
  */
-const ControlButton = (props: React.ComponentProps<typeof Button>) => (
+const ControlButton = forwardRef<RNView, React.ComponentProps<typeof Button>>((props, ref) => (
 	<Button
+		ref={ref}
 		borderRadius={999999}
 		textColor="white"
 		focusedTextColor="white"
@@ -57,13 +64,15 @@ const ControlButton = (props: React.ComponentProps<typeof Button>) => (
 		backgroundColor={"transparent"}
 		selectedBackgroundColor={zinc[700]}
 		pressedBackgroundColor={zinc[600]}
+		enableRipple={!Platform.isTV}
 		{...props}
 	/>
-);
+));
+ControlButton.displayName = "ControlButton";
 
 const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControlsRef>) => {
 	// Destructuring props
-	const { visibilityDuration = 3000, theme } = props;
+	const { visibilityDuration = 3000, theme, HeaderRightElement } = props;
 
 	// Hooks
 	const sizes = useResponsiveSize();
@@ -82,7 +91,32 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 	const [triggeredDropdown, setTriggeredDropdown] = React.useState(-1);
 	const [state, dispatch] = useComponentStateReducer({ type: "loading", message: t("PREPARING") });
 	const [controlsVisible, setControlVisibility] = React.useState(true);
+
 	const controlsVisibleRef = useRef(true);
+	const playButtonRef = useRef<RNView>(null);
+	const seekBackwardGestureRef = useRef<PlayerGestureRef>(null);
+	const seekForwardGestureRef = useRef<PlayerGestureRef>(null);
+	const playGestureRef = useRef<PlayerGestureRef>(null);
+
+	// TV: after a dropdown closes, D-pad focus must be handed back to a real control — the item
+	// that held focus collapses with the dropdown and becomes unfocusable, which otherwise leaves
+	// the system with no focused view (dead D-pad). Pulsing hasTVPreferredFocus on the play button
+	// re-anchors focus; the pulse resets shortly after so every close re-triggers it.
+	const [returnFocusPulse, setReturnFocusPulse] = React.useState(false);
+	const returnFocusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const pulseReturnFocus = useCallback(() => {
+		if (!Platform.isTV) return;
+		if (returnFocusTimerRef.current) clearTimeout(returnFocusTimerRef.current);
+		setReturnFocusPulse(true);
+		(playButtonRef.current as any)?.requestTVFocus?.();
+
+		returnFocusTimerRef.current = setTimeout(() => setReturnFocusPulse(false), 50);
+	}, []);
+	useEffect(() => {
+		return () => {
+			if (returnFocusTimerRef.current) clearTimeout(returnFocusTimerRef.current);
+		};
+	}, []);
 
 	// FIX 1: Use ref to track latest values in timeout
 	const latestValuesRef = useRef({
@@ -102,24 +136,35 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 		setControlVisibility(false);
 		props.onControlsVisibilityChange?.(false);
 	}, [props.onControlsVisibilityChange]);
-	const showControls = useCallback(() => {
-		// Clear existing timeout
-		if (visibilityTimeoutRef.current) {
-			clearTimeout(visibilityTimeoutRef.current);
+	const showControls = useCallback(
+		(forcePlayButtonFocus = false) => {
+			// Clear existing timeout
+			if (visibilityTimeoutRef.current) {
+				clearTimeout(visibilityTimeoutRef.current);
+			}
+
+			// Make controls visible (and interactive/focusable)
+			controlsVisibleRef.current = true;
+			setControlVisibility(true);
+			props.onControlsVisibilityChange?.(true);
+			visibilityOpacity.value = withTiming(1, { duration: 500, easing: Easing.ease });
+
+			// Only force a focus reset when we explicitly need to recover TV D-pad focus.
+			if (forcePlayButtonFocus) {
+				pulseReturnFocus();
+			}
+
+			// Schedule hide with proper cleanup
+			visibilityTimeoutRef.current = setTimeout(hideControls, visibilityDuration);
+		},
+		[props.onControlsVisibilityChange, visibilityDuration, hideControls, pulseReturnFocus]
+	);
+	const awakeControls = useCallback(() => {
+		if (controlsVisibleRef.current) {
+			showControls(); // keep controls awake; let native focus handle the move
+			return;
 		}
-
-		// Make controls visible (and interactive/focusable)
-		controlsVisibleRef.current = true;
-		setControlVisibility(true);
-		props.onControlsVisibilityChange?.(true);
-		visibilityOpacity.value = withTiming(1, { duration: 500, easing: Easing.ease });
-
-		// Schedule hide with proper cleanup
-		visibilityTimeoutRef.current = setTimeout(hideControls, visibilityDuration);
-	}, [state.type, props.onControlsVisibilityChange, visibilityDuration, hideControls]);
-	// "Peek": briefly reveal the scrubber/overlay WITHOUT entering interactive/focus mode. Used by the
-	// TV remote while seeking so repeated Left/Right keeps seeking (controlsVisibleRef stays false)
-	// instead of flipping into button navigation after the first press.
+	}, [hideControls, visibilityDuration]);
 	const peekScrubber = useCallback(() => {
 		if (visibilityTimeoutRef.current) {
 			clearTimeout(visibilityTimeoutRef.current);
@@ -129,9 +174,13 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 		visibilityTimeoutRef.current = setTimeout(hideControls, visibilityDuration);
 	}, [hideControls, visibilityDuration, props.onControlsVisibilityChange]);
 
+	const wakeControls = useCallback(() => {
+		showControls();
+	}, [showControls]);
+
 	const closeDropdown = useCallback(() => {
 		setTriggeredDropdown(-1);
-		showControls(); // Restart timeout when dropdown closes
+		showControls(true); // Restart timeout and re-anchor D-pad focus when dropdown closes
 	}, [showControls]);
 	const openDropdown = useCallback(
 		(index: number) => {
@@ -149,15 +198,20 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 	);
 
 	const seekForward = useCallback(() => {
+		seekForwardGestureRef.current?.animateTouch();
 		const currentTime = Number.isFinite(playerCurrentTime.value) ? playerCurrentTime.value : 0;
 		const duration = Number.isFinite(playerDurationTime.value) && playerDurationTime.value > 0 ? playerDurationTime.value : Infinity;
 		props.controls.setCurrentTime(Math.min(currentTime + 10, duration));
 	}, [props.controls]);
 	const seekBackward = useCallback(() => {
+		seekBackwardGestureRef.current?.animateTouch();
 		const currentTime = Number.isFinite(playerCurrentTime.value) ? playerCurrentTime.value : 0;
 		props.controls.setCurrentTime(Math.max(currentTime - 10, 0));
 	}, [props.controls]);
-	const togglePlay = useCallback(() => props.controls.setPause(!props.playerState.paused), [props.controls, props.playerState.paused]);
+	const togglePlay = useCallback(() => {
+		playGestureRef.current?.animateTouch();
+		props.controls.setPause(!props.playerState.paused);
+	}, [props.controls, props.playerState.paused]);
 	const toggleFullscreen = useCallback(() => props.controls.setFullscreen(!props.playerState.isFullscreen), [props.controls, props.playerState.isFullscreen]);
 	const toggleMute = useCallback(() => props.controls.setMuted(props.playerState.volume > 0), [props.controls, props.playerState.volume]);
 
@@ -183,7 +237,7 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 
 	// FIX 3: Effect to set up and clear the timeout on component mount/unmount
 	useEffect(() => {
-		showControls(); // Show controls initially
+		showControls(Platform.isTV); // Show controls initially; TV gets one deliberate focus anchor
 
 		// Cleanup on unmount
 		return () => {
@@ -229,34 +283,24 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 			menu: showControls,
 			longSelect: showControls,
 			playPause: togglePlay,
-			select: () => {
-				if (!controlsVisibleRef.current) showControls();
-			},
+			select: awakeControls,
 			left: () => {
-				if (controlsVisibleRef.current) {
-					showControls(); // keep controls awake; let native focus handle the move
-					return;
-				}
-				seekBackward();
-				peekScrubber();
+				awakeControls();
+				if (!controlsVisibleRef.current) seekBackward();
 			},
 			right: () => {
-				if (controlsVisibleRef.current) {
-					showControls();
-					return;
-				}
-				seekForward();
-				peekScrubber();
+				awakeControls();
+				if (!controlsVisibleRef.current) seekForward();
 			},
 			rewind: () => {
+				awakeControls();
+				if (!controlsVisibleRef.current) peekScrubber();
 				seekBackward();
-				if (controlsVisibleRef.current) showControls();
-				else peekScrubber();
 			},
 			fastForward: () => {
+				awakeControls();
+				if (!controlsVisibleRef.current) peekScrubber();
 				seekForward();
-				if (controlsVisibleRef.current) showControls();
-				else peekScrubber();
 			}
 		},
 		Platform.isTV
@@ -270,24 +314,32 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 		[insets, sizes.sidePadding]
 	);
 
+	const opacityStyle = useAnimatedStyle(() => ({
+		opacity: visibilityOpacity.value
+	}));
+
 	return (
-		<SafeAreaView className="player-controls !absolute !inset-0 !z-50" style={[safeStyle]} onPointerMove={showControls} onTouchStart={showControls}>
-			<AnimatedView className={"player-controls-ctn"} style={{ opacity: visibilityOpacity }} pointerEvents={controlsVisible ? "auto" : "none"}>
-				<View className={"player-header"}>
-					<ControlButton
-						onPress={props.onClosePlayer}
-						icon="xmark"
-						className={`close-btn`}
-						iconSize={sizes.span2}
-						backgroundColor={"#0000005f"}
-						style={{
-							outlineColor: "white",
-							outlineStyle: "solid",
-							outlineWidth: 2
-						}}
-					/>
-					<Text className={"only-landscape player-title"}>{props.videoTitle}</Text>
-				</View>
+		<SafeAreaView className="player-controls" style={[StyleSheet.absoluteFill, safeStyle]} onPointerMove={wakeControls} onTouchStart={wakeControls}>
+			<AnimatedView className={"player-controls-ctn"} pointerEvents={controlsVisible ? "auto" : "none"}>
+				<FocusGuide autoFocus trapFocusLeft trapFocusRight trapFocusUp className={"player-header"}>
+					<AnimatedView className={"player-header-ctn"} style={[opacityStyle]}>
+						<ControlButton
+							onPress={props.onClosePlayer}
+							icon="xmark"
+							className={`close-btn`}
+							iconSize={sizes.span2}
+							backgroundColor={"#0000005f"}
+							style={{
+								outlineColor: "white",
+								outlineStyle: "solid",
+								outlineWidth: 2
+							}}
+							{...(playButtonRef.current ? ({ nextFocusDown: playButtonRef.current } as object) : {})}
+						/>
+						<Text className={"only-landscape player-title"}>{props.videoTitle}</Text>
+						{HeaderRightElement}
+					</AnimatedView>
+				</FocusGuide>
 
 				<View className={"player-actions"}>
 					{state.type !== "idle" && (
@@ -297,12 +349,21 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 					)}
 
 					<View className={"player-gestures"} style={state.type !== "idle" && { pointerEvents: "none", opacity: 0 }}>
-						<PlayerGesture icon={"backward_10_seconds"} onPress={seekBackward} autoHide disable={props.playerState.isLive} />
-						<PlayerGesture icon={props.playerState.paused ? "play" : "pause"} onPress={togglePlay} tap={1} autoHide={!props.playerState.paused} />
-						<PlayerGesture icon={"forward_10_seconds"} onPress={seekForward} autoHide disable={props.playerState.isLive} />
+						<PlayerGesture ref={seekBackwardGestureRef} icon={"backward_10_seconds"} onPress={seekBackward} autoHide disable={props.playerState.isLive} />
+						<PlayerGesture
+							ref={playGestureRef}
+							icon={props.playerState.paused ? "play" : "pause"}
+							onPress={togglePlay}
+							tap={1}
+							autoHide={!props.playerState.paused}
+						/>
+						<PlayerGesture ref={seekForwardGestureRef} icon={"forward_10_seconds"} onPress={seekForward} autoHide disable={props.playerState.isLive} />
 					</View>
 
-					<View className={"player-menus"} style={{ pointerEvents: Platform.OS === "web" || state.type !== "idle" ? "none" : "box-none" }}>
+					<AnimatedView
+						className={"player-menus"}
+						style={[opacityStyle, { pointerEvents: Platform.OS === "web" || state.type !== "idle" ? "none" : "box-none" }]}
+					>
 						<PlayerDropdown
 							open={triggeredDropdown == 0}
 							title={t("VIDEO_SOURCES")}
@@ -357,9 +418,10 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 							afterSelect={closeDropdown}
 							getItemText={(i: AudioTrack) => (i.lang ? `${i.name} (${i.lang})` : i.name)}
 						/>
-					</View>
+					</AnimatedView>
 				</View>
-				<View className={"player-progress"} style={{ height: sizes.span6 - 2 }}>
+
+				<AnimatedView className={"player-progress"} style={[opacityStyle, { height: sizes.span6 - 2 }]}>
 					<Slider
 						progress={playerCurrentTime}
 						minimumValue={playerMinDuration}
@@ -373,7 +435,7 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 						disableTapEvent={false}
 						// Styling
 						thumbTouchSize={sizes.span1}
-						sliderHeight={sizes.span6 - 2}
+						sliderHeight={Platform.isTV ? sizes.span6 : sizes.span6 - 2}
 						style={{ height: sizes.h1 }}
 						theme={{
 							minimumTrackTintColor: sky[500],
@@ -388,95 +450,108 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 							color: "black"
 						}}
 					/>
-				</View>
-				<View className={"player-buttons"}>
-					<ControlButton onPress={togglePlay} icon={!props.playerState.paused ? "pause" : "play"} className={`player-button`} iconSize={defaultIconSize} />
+				</AnimatedView>
 
-					{/* Seek buttons are hidden and disabled for live streams */}
-					<ControlButton
-						hideAndDisable={props.playerState.isLive}
-						onPress={seekBackward}
-						icon="backward_10_seconds"
-						className={`only-landscape player-button`}
-						iconSize={defaultIconSize}
-					/>
-
-					<ControlButton
-						hideAndDisable={props.playerState.isLive}
-						onPress={seekForward}
-						icon="forward_10_seconds"
-						className={`only-landscape player-button`}
-						iconSize={defaultIconSize}
-					/>
-
-					<ControlButton
-						onPress={toggleMute}
-						icon={props.playerState.volume == 0 ? "volume_slash" : "volume_high"}
-						className={`only-landscape player-button`}
-						iconSize={defaultIconSize}
-					/>
-
-					{props.onNextVideo && (
+				<FocusGuide autoFocus trapFocusLeft trapFocusRight trapFocusDown className={"player-buttons"}>
+					<AnimatedView className={"player-buttons-ctn"} style={[opacityStyle]}>
 						<ControlButton
-							onPress={props.onNextVideo}
-							icon={"next"}
-							text={props.nextLabel || t("NEXT_VIDEO")}
-							className={"only-landscape player-button next-button"}
-							iconSize={defaultIconSize}
-						/>
-					)}
-
-					<TimeDisplayer currentTime={playerCurrentTime} fullTime={playerDurationTime} />
-
-					<View className={"player-buttons-separator"} />
-
-					<ControlButton
-						onPress={() => openDropdown(4)}
-						icon="speed"
-						className={`player-button only-landscape`}
-						iconSize={defaultIconSize - 4}
-						{...((props.resources.rates.length < 1 || props.playerState.isLive) && { style: { display: "none" } })}
-					/>
-
-					<ControlButton onPress={() => openDropdown(0)} icon="globe" className={`player-button`} iconSize={defaultIconSize} />
-
-					{/* Audio track button — hidden when there is only one (or zero) audio tracks */}
-					<ControlButton
-						onPress={() => openDropdown(3)}
-						icon="audio_wave"
-						className={`player-button`}
-						iconSize={defaultIconSize}
-						{...(props.resources.audioTracks.length <= 1 && { style: { display: "none" } })}
-					/>
-
-					<ControlButton
-						onPress={() => openDropdown(1)}
-						icon="subtitle"
-						className={`player-button`}
-						iconSize={defaultIconSize}
-						{...(props.resources.subtitles.length === 0 && { style: { display: "none" } })}
-					/>
-
-					<ControlButton
-						onPress={() => openDropdown(2)}
-						icon="settings"
-						className={`player-button`}
-						iconSize={defaultIconSize}
-						{...(props.resources.levels.length === 0 && { style: { display: "none" } })}
-					/>
-
-					{Platform.OS === "web" && (
-						<ControlButton
-							onPress={toggleFullscreen}
-							icon={props.playerState.isFullscreen ? "compress" : "expand"}
+							ref={playButtonRef}
+							onPress={togglePlay}
+							icon={!props.playerState.paused ? "pause" : "play"}
 							className={`player-button`}
 							iconSize={defaultIconSize}
+							hasTVPreferredFocus={returnFocusPulse}
 						/>
-					)}
-				</View>
+
+						{/* Seek buttons are hidden and disabled for live streams */}
+						<ControlButton
+							hideAndDisable={props.playerState.isLive}
+							onPress={seekBackward}
+							icon="backward_10_seconds"
+							className={`only-landscape player-button`}
+							iconSize={defaultIconSize}
+						/>
+
+						<ControlButton
+							hideAndDisable={props.playerState.isLive}
+							onPress={seekForward}
+							icon="forward_10_seconds"
+							className={`only-landscape player-button`}
+							iconSize={defaultIconSize}
+						/>
+
+						<ControlButton
+							onPress={toggleMute}
+							icon={props.playerState.volume == 0 ? "volume_slash" : "volume_high"}
+							className={`only-landscape player-button`}
+							iconSize={defaultIconSize}
+						/>
+
+						{props.onNextVideo && (
+							<ControlButton
+								onPress={props.onNextVideo}
+								icon={"next"}
+								text={props.nextLabel || t("NEXT_VIDEO")}
+								className={"only-landscape next-button"}
+								iconSize={defaultIconSize}
+							/>
+						)}
+
+						<TimeDisplayer currentTime={playerCurrentTime} fullTime={playerDurationTime} />
+
+						<View className={"player-buttons-separator"} />
+
+						<ControlButton
+							onPress={() => openDropdown(4)}
+							icon="speed"
+							className={`player-button only-landscape`}
+							iconSize={defaultIconSize - 4}
+							// focusable:false alongside display:none — a hidden button is otherwise still a
+							// 0-size focus candidate on Android TV and derails directional navigation.
+							{...((props.resources.rates.length < 1 || props.playerState.isLive) && { style: { display: "none" }, focusable: false })}
+						/>
+
+						<ControlButton onPress={() => openDropdown(0)} icon="globe" className={`player-button`} iconSize={defaultIconSize} />
+
+						{/* Audio track button — hidden when there is only one (or zero) audio tracks */}
+						<ControlButton
+							onPress={() => openDropdown(3)}
+							icon="audio_wave"
+							className={`player-button`}
+							iconSize={defaultIconSize}
+							{...(props.resources.audioTracks.length <= 1 && { style: { display: "none" }, focusable: false })}
+						/>
+
+						<ControlButton
+							onPress={() => openDropdown(1)}
+							icon="subtitle"
+							className={`player-button`}
+							iconSize={defaultIconSize}
+							{...(props.resources.subtitles.length === 0 && { style: { display: "none" }, focusable: false })}
+						/>
+
+						<ControlButton
+							onPress={() => openDropdown(2)}
+							icon="settings"
+							className={`player-button`}
+							iconSize={defaultIconSize}
+							{...(props.resources.levels.length === 0 && { style: { display: "none" }, focusable: false })}
+						/>
+
+						{Platform.OS === "web" && (
+							<ControlButton
+								onPress={toggleFullscreen}
+								icon={props.playerState.isFullscreen ? "compress" : "expand"}
+								className={`player-button`}
+								iconSize={defaultIconSize}
+							/>
+						)}
+					</AnimatedView>
+				</FocusGuide>
 			</AnimatedView>
 		</SafeAreaView>
 	);
 });
+PlayerControls.displayName = "PlayerControls";
 
 export default memo(PlayerControls);
