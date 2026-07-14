@@ -24,6 +24,9 @@
 	"main": "./dist/module/index.js",
 	"module": "./dist/module/index.js",
 	"types": "./dist/typescript/src/index.d.ts",
+	"sideEffects": [
+		"*.css"
+	],
 	"styles": "./dist/css/styles.css",
 	"exports": {
 		".": {

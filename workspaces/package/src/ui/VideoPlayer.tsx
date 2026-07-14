@@ -75,7 +75,19 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 	const videoRef = React.useRef<VideoRef>(null);
 	const controlsRef = React.useRef<PlayerControlsRef>(null);
 	const playerViewRef = React.useRef<RNView>(null);
+
+	// `.video-controls-on` only shifts native <track> cues on web (::-webkit-media-text-track-container).
+	// Off web nothing reads it, so don't hold it in state there: every show/hide would otherwise
+	// re-render <Video> + the whole controls tree.
+	const tracksControlsVisibility = Platform.OS === "web";
 	const [controlsVisible, setControlsVisible] = React.useState(true);
+
+	// Consumer callbacks read through a ref: inline props from the host would otherwise churn the
+	// identity of every handler below and defeat memo(PlayerControls).
+	const callbacksRef = React.useRef({ onControlVisibilityChange, onSourceChange, onSubtitleChange, onPlaybackChange, onProgress, onEnd, onClosePlayer: props.onClosePlayer, onNextVideo });
+	useEffect(() => {
+		callbacksRef.current = { onControlVisibilityChange, onSourceChange, onSubtitleChange, onPlaybackChange, onProgress, onEnd, onClosePlayer: props.onClosePlayer, onNextVideo };
+	});
 
 	// Injects the responsive CSS variables (scaled by the TV pixel-ratio) onto the player root so
 	// every `var(--...)` in styles.css resolves on native — otherwise the whole control layout
@@ -96,14 +108,25 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 	const handleProgress = useCallback(
 		(event: OnProgressData) => {
 			nativeVideoProps?.onProgress?.(event);
-			onProgress?.(event.currentTime);
+			callbacksRef.current.onProgress?.(event.currentTime);
 		},
-		[nativeVideoProps?.onProgress, onProgress]
+		[nativeVideoProps?.onProgress]
 	);
 	const handleEnd = useCallback(() => {
 		nativeVideoProps?.onEnd?.();
-		onEnd?.();
-	}, [nativeVideoProps?.onEnd, onEnd]);
+		callbacksRef.current.onEnd?.();
+	}, [nativeVideoProps?.onEnd]);
+
+	// Stable handlers handed to PlayerControls.
+	const handleControlsVisibility = useCallback(
+		(visible: boolean) => {
+			if (tracksControlsVisibility) setControlsVisible(visible);
+			callbacksRef.current.onControlVisibilityChange?.(visible);
+		},
+		[tracksControlsVisibility]
+	);
+	const handleClosePlayer = useCallback(() => callbacksRef.current.onClosePlayer?.(), []);
+	const handleNextVideo = useCallback(() => callbacksRef.current.onNextVideo?.(), []);
 
 	const videoProps: ReactVideoProps = useMemo(
 		() => ({
@@ -122,18 +145,15 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 	// Callbacks for source and subtitle changes
 	useEffect(() => {
 		const source = playbackResources.sources[playerState.sourceIndex];
-		if (source) onSourceChange?.(playerState.sourceIndex, source);
-	}, [onSourceChange, playbackResources.sources, playerState.sourceIndex]);
+		if (source) callbacksRef.current.onSourceChange?.(playerState.sourceIndex, source);
+	}, [playbackResources.sources, playerState.sourceIndex]);
 	useEffect(() => {
 		const subtitle = playbackResources.subtitles[playerState.subtitleIndex];
-		if (subtitle) onSubtitleChange?.(playerState.subtitleIndex, subtitle);
-	}, [onSubtitleChange, playbackResources.subtitles, playerState.subtitleIndex]);
+		if (subtitle) callbacksRef.current.onSubtitleChange?.(playerState.subtitleIndex, subtitle);
+	}, [playbackResources.subtitles, playerState.subtitleIndex]);
 	useEffect(() => {
-		onControlVisibilityChange?.(controlsVisible);
-	}, [controlsVisible, onControlVisibilityChange]);
-	useEffect(() => {
-		onPlaybackChange?.(!playerState.paused);
-	}, [onPlaybackChange, playerState.paused]);
+		callbacksRef.current.onPlaybackChange?.(!playerState.paused);
+	}, [playerState.paused]);
 
 	useLayoutEffect(() => {
 		if (Platform.OS !== "web") return;
@@ -203,9 +223,9 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 				playerState={playerState}
 				nextLabel={nextLabel}
 				HeaderRightElement={HeaderRightElement}
-				onControlsVisibilityChange={setControlsVisible}
-				onClosePlayer={props.onClosePlayer}
-				onNextVideo={onNextVideo}
+				onControlsVisibilityChange={handleControlsVisibility}
+				onClosePlayer={handleClosePlayer}
+				onNextVideo={onNextVideo ? handleNextVideo : undefined}
 				visibilityDuration={visibilityDuration}
 			/>
 		</View>

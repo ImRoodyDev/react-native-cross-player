@@ -191,6 +191,60 @@ export function CustomPlayer() {
 }
 ```
 
+## Performance
+
+The control bar is a large tree — buttons, dropdowns, scrubber, focus guides — and everything under `PlayerControls` is memoised, so it does nothing while you watch. But memoisation compares **prop identity, not value**. A single unstable prop from your page defeats it and re-renders the entire tree, re-resolving the styles of hundreds of views. On a TV box that is the difference between 60fps and a visibly janky control bar.
+
+**Bad — every prop here is a new object/array/element on each render:**
+
+```tsx
+<VideoPlayer
+  videoTitle="Big Buck Bunny"
+  playerConfig={{
+    playerId: 'player',
+    videoSources: [{ id: 'main', playerId: 'player', label: 'Main', source: url, format: 'mp4' }],
+    initialVideoSource: 0,
+  }}
+  theme={{ minimumTrackTintColor: '#38bdf8' }}
+  HeaderRightElement={<MuteButton muted={muted} />}
+/>
+```
+
+This looks harmless, and it is the most common cause of player jank: any state change anywhere in the page rebuilds all of those props, and the control bar re-renders with them.
+
+**Good — stable identities, so the controls re-render only on real changes:**
+
+```tsx
+const THEME = { minimumTrackTintColor: '#38bdf8' }; // hoisted — never changes
+
+function Page() {
+  const videoSources = React.useMemo(
+    () => [{ id: 'main', playerId: 'player', label: 'Main', source: url, format: 'mp4' }],
+    [url],
+  );
+  const playerConfig = React.useMemo(
+    () => ({ playerId: 'player', videoSources, initialVideoSource: 0 }),
+    [videoSources],
+  );
+  const headerRight = React.useMemo(() => <MuteButton muted={muted} />, [muted]);
+
+  return <VideoPlayer playerConfig={playerConfig} theme={THEME} HeaderRightElement={headerRight} />;
+}
+```
+
+What the player stabilises for you, and what it cannot:
+
+| Prop | Stabilised? |
+| --- | --- |
+| `playerConfig.videoSources` / `subtitleSources` | **Yes** — compared by content, so an inline array is tolerated (it still costs a comparison every render; prefer `useMemo`). |
+| `theme` | **No** — an inline object re-renders the whole control bar. Hoist it or `useMemo` it. |
+| `HeaderRightElement` | **No** — inline JSX is a new element every render. `useMemo` it. |
+| `onClosePlayer`, `onNextVideo`, `onProgress`, `onEnd`, `onControlVisibilityChange`, … | **Yes** — read through a ref, so they are safe to pass inline. |
+
+> **Rule of thumb:** callbacks are safe to inline. Objects, arrays and JSX elements are not.
+
+**Profiling:** measure on a **release** build via [`@callstack/inspector`](https://github.com/callstackincubator/inspector). React DevTools attaches to dev builds, where every render is far slower than production — dev timings will point you at problems that do not exist in a shipped app. When you open a slow commit in the profiler, a component listed as `props changed: theme` or `props changed: resources` is an unstable prop coming from your page, not from the player.
+
 ## Public exports
 
 The package entry exports more than the ready-made components:

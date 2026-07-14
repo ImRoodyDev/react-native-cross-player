@@ -20,8 +20,8 @@ import PlayerDropdown from "./PlayerDropdown";
 import { Slider, SliderThemeType } from "react-native-awesome-slider";
 import { formatTime } from "../utils/helpers";
 import TimeDisplayer from "./TimeDisplayer";
-import { PlaybackResources, PlayerState, VideoControls, AudioTrack } from "../types/player";
-import { SubtitleSource } from "../types/media";
+import { PlaybackResources, PlayerState, VideoControls, AudioTrack, QualityLevel } from "../types/player";
+import { SubtitleSource, VideoSource } from "../types/media";
 
 export type ControlsProps = {
 	videoTitle: string;
@@ -54,21 +54,36 @@ export type PlayerControlsRef = {
  * any prop can still be overridden per-usage since {...props} spreads last.
  * Forwards ref so buttons can be used as TV focus destinations (nextFocus*).
  */
-const ControlButton = forwardRef<RNView, React.ComponentProps<typeof Button>>((props, ref) => (
-	<Button
-		ref={ref}
-		borderRadius={999999}
-		textColor="white"
-		focusedTextColor="white"
-		pressedScale={0.9}
-		backgroundColor={"transparent"}
-		selectedBackgroundColor={zinc[700]}
-		pressedBackgroundColor={zinc[600]}
-		enableRipple={!Platform.isTV}
-		{...props}
-	/>
-));
+const ControlButton = memo(
+	forwardRef<RNView, React.ComponentProps<typeof Button>>((props, ref) => (
+		<Button
+			ref={ref}
+			borderRadius={999999}
+			textColor="white"
+			focusedTextColor="white"
+			pressedScale={0.9}
+			backgroundColor={"transparent"}
+			selectedBackgroundColor={zinc[700]}
+			pressedBackgroundColor={zinc[600]}
+			enableRipple={!Platform.isTV}
+			{...props}
+		/>
+	))
+);
 ControlButton.displayName = "ControlButton";
+
+// Hoisted: inline literals would give every button a new `style`/prop object each render and
+// defeat memo on the whole button subtree.
+const CLOSE_BUTTON_STYLE = { outlineColor: "white", outlineStyle: "solid", outlineWidth: 2 } as const;
+// focusable:false alongside display:none — a hidden button is otherwise still a 0-size focus
+// candidate on Android TV and derails directional navigation.
+const HIDDEN_PROPS = { style: { display: "none" }, focusable: false } as const;
+
+const getSourceText = (i: VideoSource) => i.label;
+const getSubtitleText = (i: SubtitleSource) => i.label || i.langISO;
+const getLevelText = (i: QualityLevel) => i.name;
+const getRateText = (rate: number) => `${String(rate).replace(/\.0$/, "")}x`;
+const getAudioText = (i: AudioTrack) => (i.lang ? `${i.name} (${i.lang})` : i.name);
 
 const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControlsRef>) => {
 	// Destructuring props
@@ -93,7 +108,14 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 	const [controlsVisible, setControlVisibility] = React.useState(true);
 
 	const controlsVisibleRef = useRef(true);
-	const playButtonRef = useRef<RNView>(null);
+	const playButtonRef = useRef<RNView | null>(null);
+	// Node kept in state as well: `nextFocusDown` needs the mounted view, and a ref alone never
+	// re-renders the close button to apply it (it only ever landed by luck on an unrelated render).
+	const [playButtonNode, setPlayButtonNode] = React.useState<RNView | null>(null);
+	const setPlayButton = useCallback((node: RNView | null) => {
+		playButtonRef.current = node;
+		setPlayButtonNode(node);
+	}, []);
 	const seekBackwardGestureRef = useRef<PlayerGestureRef>(null);
 	const seekForwardGestureRef = useRef<PlayerGestureRef>(null);
 	const playGestureRef = useRef<PlayerGestureRef>(null);
@@ -195,6 +217,36 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 			}
 		},
 		[closeDropdown, triggeredDropdown]
+	);
+
+	// Stable per-dropdown open handlers — `() => openDropdown(n)` inline would hand every trigger
+	// button a new onPress each render and defeat memo(ControlButton).
+	const openSourceDropdown = useCallback(() => openDropdown(0), [openDropdown]);
+	const openSubtitleDropdown = useCallback(() => openDropdown(1), [openDropdown]);
+	const openQualityDropdown = useCallback(() => openDropdown(2), [openDropdown]);
+	const openAudioDropdown = useCallback(() => openDropdown(3), [openDropdown]);
+	const openRateDropdown = useCallback(() => openDropdown(4), [openDropdown]);
+
+	// Stable dropdown/slider handlers, same reason.
+	const selectSource = useCallback((_: VideoSource, index: number) => props.controls.setSource(index), [props.controls]);
+	const selectSubtitle = useCallback(
+		(_: SubtitleSource, index: number) => {
+			if (index === 0) props.controls.setSubtitleOff();
+			else props.controls.setSubtitle(index - 1);
+		},
+		[props.controls]
+	);
+	const selectLevel = useCallback((_: QualityLevel, index: number) => props.controls.setResolution(index), [props.controls]);
+	const selectRate = useCallback((rate: number) => props.controls.setPlaybackRate(rate), [props.controls]);
+	const selectAudio = useCallback((_: AudioTrack, index: number) => props.controls.setAudioTrack(index), [props.controls]);
+	const seekTo = useCallback((value: number) => props.controls.setCurrentTime(value), [props.controls]);
+
+	// `t()` is a plain lookup, so keep resolving it every render; the memo only rebuilds the array
+	// when the label or the list actually changes (so a language switch still propagates).
+	const subtitlesOffLabel = t("SUBTITLES_OFF");
+	const subtitleItems = useMemo(
+		() => [{ id: "off", label: subtitlesOffLabel, langISO: "off" } as SubtitleSource, ...props.resources.subtitles],
+		[props.resources.subtitles, subtitlesOffLabel]
 	);
 
 	const seekForward = useCallback(() => {
@@ -318,23 +370,43 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 		opacity: visibilityOpacity.value
 	}));
 
+	// Memoized style arrays/objects: inline literals re-render the (expensive) CssInterop/Animated
+	// wrappers below on every pass.
+	const rootStyle = useMemo(() => [StyleSheet.absoluteFill, safeStyle], [safeStyle]);
+	const opacityStyleArr = useMemo(() => [opacityStyle], [opacityStyle]);
+	const statusHiddenStyle = useMemo(() => (state.type !== "idle" ? ({ pointerEvents: "none", opacity: 0 } as const) : undefined), [state.type]);
+	const menusStyle = useMemo(
+		() => [opacityStyle, { pointerEvents: Platform.OS === "web" || state.type !== "idle" ? ("none" as const) : ("box-none" as const) }],
+		[opacityStyle, state.type]
+	);
+	const progressStyle = useMemo(() => [opacityStyle, { height: sizes.span6 - 2 }], [opacityStyle, sizes.span6]);
+	const sliderStyle = useMemo(() => ({ height: sizes.h1 }), [sizes.h1]);
+	const sliderTheme = useMemo(
+		() => ({
+			minimumTrackTintColor: sky[500],
+			maximumTrackTintColor: zinc[700],
+			cacheTrackTintColor: zinc[500],
+			bubbleBackgroundColor: sky[500],
+			...theme
+		}),
+		[theme]
+	);
+	const bubbleTextStyle = useMemo(() => ({ fontSize: sizes.span2, fontFamily: "Montserrat-Medium", color: "black" }), [sizes.span2]);
+	const closeButtonFocus = useMemo(() => (playButtonNode ? ({ nextFocusDown: playButtonNode } as object) : {}), [playButtonNode]);
+
 	return (
-		<SafeAreaView className="player-controls" style={[StyleSheet.absoluteFill, safeStyle]} onPointerMove={wakeControls} onTouchStart={wakeControls}>
+		<SafeAreaView className="player-controls" style={rootStyle} onPointerMove={wakeControls} onTouchStart={wakeControls}>
 			<AnimatedView className={"player-controls-ctn"} pointerEvents={controlsVisible ? "auto" : "none"}>
 				<FocusGuide autoFocus trapFocusLeft trapFocusRight trapFocusUp className={"player-header"}>
-					<AnimatedView className={"player-header-ctn"} style={[opacityStyle]}>
+					<AnimatedView className={"player-header-ctn"} style={opacityStyleArr}>
 						<ControlButton
 							onPress={props.onClosePlayer}
 							icon="xmark"
 							className={`close-btn`}
 							iconSize={sizes.span2}
 							backgroundColor={"#0000005f"}
-							style={{
-								outlineColor: "white",
-								outlineStyle: "solid",
-								outlineWidth: 2
-							}}
-							{...(playButtonRef.current ? ({ nextFocusDown: playButtonRef.current } as object) : {})}
+							style={CLOSE_BUTTON_STYLE}
+							{...closeButtonFocus}
 						/>
 						<Text className={"only-landscape player-title"}>{props.videoTitle}</Text>
 						{HeaderRightElement}
@@ -348,7 +420,7 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 						</View>
 					)}
 
-					<View className={"player-gestures"} style={state.type !== "idle" && { pointerEvents: "none", opacity: 0 }}>
+					<View className={"player-gestures"} style={statusHiddenStyle}>
 						<PlayerGesture ref={seekBackwardGestureRef} icon={"backward_10_seconds"} onPress={seekBackward} autoHide disable={props.playerState.isLive} />
 						<PlayerGesture
 							ref={playGestureRef}
@@ -360,42 +432,33 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 						<PlayerGesture ref={seekForwardGestureRef} icon={"forward_10_seconds"} onPress={seekForward} autoHide disable={props.playerState.isLive} />
 					</View>
 
-					<AnimatedView
-						className={"player-menus"}
-						style={[opacityStyle, { pointerEvents: Platform.OS === "web" || state.type !== "idle" ? "none" : "box-none" }]}
-					>
+					<AnimatedView className={"player-menus"} style={menusStyle}>
 						<PlayerDropdown
 							open={triggeredDropdown == 0}
 							title={t("VIDEO_SOURCES")}
 							defaultSelected={props.playerState.sourceIndex}
 							items={props.resources.sources}
-							onSelect={(_, index) => props.controls.setSource(index)}
+							onSelect={selectSource}
 							afterSelect={closeDropdown}
-							getItemText={(i) => i.label}
+							getItemText={getSourceText}
 						/>
 						<PlayerDropdown
 							open={triggeredDropdown == 1}
 							title={t("VIDEO_CAPTION")}
 							defaultSelected={props.playerState.subtitleIndex + 1}
-							items={[{ id: "off", label: t("SUBTITLES_OFF"), langISO: "off" } as SubtitleSource, ...props.resources.subtitles]}
-							onSelect={(_, index) => {
-								if (index === 0) {
-									props.controls.setSubtitleOff();
-								} else {
-									props.controls.setSubtitle(index - 1);
-								}
-							}}
+							items={subtitleItems}
+							onSelect={selectSubtitle}
 							afterSelect={closeDropdown}
-							getItemText={(i) => i.label || i.langISO}
+							getItemText={getSubtitleText}
 						/>
 						<PlayerDropdown
 							open={triggeredDropdown == 2}
 							title={t("VIDEO_QUALITY")}
 							defaultSelected={props.playerState.levelIndex}
 							items={props.resources.levels}
-							onSelect={(_, index) => props.controls.setResolution(index)}
+							onSelect={selectLevel}
 							afterSelect={closeDropdown}
-							getItemText={(i) => i.name}
+							getItemText={getLevelText}
 						/>
 
 						<PlayerDropdown
@@ -403,9 +466,9 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 							title={t("PLAYBACK_RATE")}
 							defaultValue={props.playerState.rate}
 							items={props.resources.rates}
-							onSelect={(rate) => props.controls.setPlaybackRate(rate)}
+							onSelect={selectRate}
 							afterSelect={closeDropdown}
-							getItemText={(rate) => `${String(rate).replace(/\.0$/, "")}x`}
+							getItemText={getRateText}
 						/>
 
 						{/* Audio track selector — only rendered when the media has multiple audio tracks */}
@@ -414,21 +477,21 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 							title={t("AUDIO_TRACKS")}
 							defaultSelected={props.playerState.audioIndex}
 							items={props.resources.audioTracks}
-							onSelect={(_, index) => props.controls.setAudioTrack(index)}
+							onSelect={selectAudio}
 							afterSelect={closeDropdown}
-							getItemText={(i: AudioTrack) => (i.lang ? `${i.name} (${i.lang})` : i.name)}
+							getItemText={getAudioText}
 						/>
 					</AnimatedView>
 				</View>
 
-				<AnimatedView className={"player-progress"} style={[opacityStyle, { height: sizes.span6 - 2 }]}>
+				<AnimatedView className={"player-progress"} style={progressStyle}>
 					<Slider
 						progress={playerCurrentTime}
 						minimumValue={playerMinDuration}
 						maximumValue={playerDurationTime}
 						cache={playerPlayableTime}
 						// Configurations
-						onValueChange={(value) => props.controls.setCurrentTime(value)}
+						onValueChange={seekTo}
 						bubble={formatTime}
 						hapticMode={"step"}
 						forceSnapToStep={false}
@@ -436,26 +499,16 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 						// Styling
 						thumbTouchSize={sizes.span1}
 						sliderHeight={Platform.isTV ? sizes.span6 : sizes.span6 - 2}
-						style={{ height: sizes.h1 }}
-						theme={{
-							minimumTrackTintColor: sky[500],
-							maximumTrackTintColor: zinc[700],
-							cacheTrackTintColor: zinc[500],
-							bubbleBackgroundColor: sky[500],
-							...theme
-						}}
-						bubbleTextStyle={{
-							fontSize: sizes.span2,
-							fontFamily: "Montserrat-Medium",
-							color: "black"
-						}}
+						style={sliderStyle}
+						theme={sliderTheme}
+						bubbleTextStyle={bubbleTextStyle}
 					/>
 				</AnimatedView>
 
 				<FocusGuide autoFocus trapFocusLeft trapFocusRight trapFocusDown className={"player-buttons"}>
-					<AnimatedView className={"player-buttons-ctn"} style={[opacityStyle]}>
+					<AnimatedView className={"player-buttons-ctn"} style={opacityStyleArr}>
 						<ControlButton
-							ref={playButtonRef}
+							ref={setPlayButton}
 							onPress={togglePlay}
 							icon={!props.playerState.paused ? "pause" : "play"}
 							className={`player-button`}
@@ -497,45 +550,43 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 							/>
 						)}
 
-						<TimeDisplayer currentTime={playerCurrentTime} fullTime={playerDurationTime} />
+						<TimeDisplayer currentTime={playerCurrentTime} fullTime={playerDurationTime} visibility={visibilityOpacity} />
 
 						<View className={"player-buttons-separator"} />
 
 						<ControlButton
-							onPress={() => openDropdown(4)}
+							onPress={openRateDropdown}
 							icon="speed"
 							className={`player-button only-landscape`}
 							iconSize={defaultIconSize - 4}
-							// focusable:false alongside display:none — a hidden button is otherwise still a
-							// 0-size focus candidate on Android TV and derails directional navigation.
-							{...((props.resources.rates.length < 1 || props.playerState.isLive) && { style: { display: "none" }, focusable: false })}
+							{...((props.resources.rates.length < 1 || props.playerState.isLive) && HIDDEN_PROPS)}
 						/>
 
-						<ControlButton onPress={() => openDropdown(0)} icon="globe" className={`player-button`} iconSize={defaultIconSize} />
+						<ControlButton onPress={openSourceDropdown} icon="globe" className={`player-button`} iconSize={defaultIconSize} />
 
 						{/* Audio track button — hidden when there is only one (or zero) audio tracks */}
 						<ControlButton
-							onPress={() => openDropdown(3)}
+							onPress={openAudioDropdown}
 							icon="audio_wave"
 							className={`player-button`}
 							iconSize={defaultIconSize}
-							{...(props.resources.audioTracks.length <= 1 && { style: { display: "none" }, focusable: false })}
+							{...(props.resources.audioTracks.length <= 1 && HIDDEN_PROPS)}
 						/>
 
 						<ControlButton
-							onPress={() => openDropdown(1)}
+							onPress={openSubtitleDropdown}
 							icon="subtitle"
 							className={`player-button`}
 							iconSize={defaultIconSize}
-							{...(props.resources.subtitles.length === 0 && { style: { display: "none" }, focusable: false })}
+							{...(props.resources.subtitles.length === 0 && HIDDEN_PROPS)}
 						/>
 
 						<ControlButton
-							onPress={() => openDropdown(2)}
+							onPress={openQualityDropdown}
 							icon="settings"
 							className={`player-button`}
 							iconSize={defaultIconSize}
-							{...(props.resources.levels.length === 0 && { style: { display: "none" }, focusable: false })}
+							{...(props.resources.levels.length === 0 && HIDDEN_PROPS)}
 						/>
 
 						{Platform.OS === "web" && (

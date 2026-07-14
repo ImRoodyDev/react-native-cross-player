@@ -127,6 +127,22 @@ export type PlayerControllerProps = {
 	preservePlaybackOnSourceChange?: boolean;
 };
 
+/** Playback rates are fixed; hoisted so `playbackResources` never hands the UI a new array. */
+const PLAYBACK_RATES = [0.5, 1.0, 1.5, 2.0];
+
+/**
+ * Keeps a list referentially stable while its *content* is unchanged.
+ *
+ * Consumers routinely pass inline arrays (`playerConfig={{ videoSources: [...] }}`), whose identity
+ * changes on every host render. Without this, every render of the host page rebuilt playerState /
+ * playbackResources / controls and re-rendered the entire control tree.
+ */
+function useStableList<T>(list: T[]): T[] {
+	const signature = useMemo(() => JSON.stringify(list), [list]);
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	return useMemo(() => list, [signature]);
+}
+
 export function usePlayerController(props: PlayerControllerProps): PlayerControllerState {
 	const {
 		playerId,
@@ -141,8 +157,8 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 		initialVideoSource = -1,
 		initialSubtitleSource = -1,
 		initialAudioTrack = -1,
-		subtitleSources = [],
-		videoSources = [],
+		subtitleSources: subtitleSourcesProp = [],
+		videoSources: videoSourcesProp = [],
 		videoRef,
 
 		// Proxy Settings
@@ -156,6 +172,11 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 		preservePlaybackOnSourceChange = true,
 		onLazyLoadSource
 	} = props;
+
+	// Identity-stable views of the source lists — everything below (effects, memos, controls) keys
+	// off these, so an inline array from the host can no longer churn the whole player.
+	const videoSources = useStableList(videoSourcesProp);
+	const subtitleSources = useStableList(subtitleSourcesProp);
 
 	// States and refs
 	const isMountedRef = useRef(true); // Track if component is mounted
@@ -604,6 +625,12 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 		// Video Element cleanup
 		clearPendingSeek();
 		stopLoadSource();
+		// onBuffer only clears this on the buffering->idle edge, so a pending debounce could outlive
+		// the player.
+		if (bufferTimeoutRef.current) {
+			clearTimeout(bufferTimeoutRef.current);
+			bufferTimeoutRef.current = undefined;
+		}
 		nativeSubtitleResumeRef.current = undefined;
 		if (nativeSubtitleResumeTimerRef.current) {
 			clearTimeout(nativeSubtitleResumeTimerRef.current);
@@ -1039,7 +1066,7 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 	const playbackResources = useMemo(
 		() => ({
 			levels,
-			rates: [0.5, 1.0, 1.5, 2.0],
+			rates: PLAYBACK_RATES,
 			sources: videoSources,
 			subtitles: subtitleSources,
 			audioTracks

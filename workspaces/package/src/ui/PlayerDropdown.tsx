@@ -42,18 +42,23 @@ function PlayerDropdown<T>({ title, open, items, onSelect, getItemText, afterSel
 	const height = useSharedValue(0);
 	const opacity = useSharedValue(0);
 
+	// Read off `rest` up front: `rest` itself is a fresh object every render, so depending on it
+	// made this memo (and the findIndex scan) re-run on every pass.
+	const defaultSelected = (rest as { defaultSelected?: number }).defaultSelected;
+	const defaultValue = (rest as { defaultValue?: T }).defaultValue;
+
 	const resolvedDefaultIndex = useMemo(() => {
-		if ("defaultSelected" in rest && typeof rest.defaultSelected === "number") {
-			return rest.defaultSelected;
+		if (typeof defaultSelected === "number") {
+			return defaultSelected;
 		}
 
-		if ("defaultValue" in rest) {
-			const idx = items.findIndex((i) => Object.is(i, rest.defaultValue));
+		if (defaultValue !== undefined) {
+			const idx = items.findIndex((i) => Object.is(i, defaultValue));
 			return idx >= 0 ? idx : 0;
 		}
 
 		return 0;
-	}, [items, rest]);
+	}, [items, defaultSelected, defaultValue]);
 
 	const [selectedIndex, setSelectedIndex] = useState<number>(resolvedDefaultIndex);
 	const [isDropdownOpen, setDropdownOpen] = useState(open ?? false);

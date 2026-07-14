@@ -86,8 +86,14 @@ export async function fetchSource(
 			headers: options?.useProxy && !isBlob ? options.proxyHeaders : {}
 		};
 
-		const response = await fetch(fetchUrl, fetchOptions);
-		clearTimeout(timeoutId);
+		// finally: a rejected fetch used to skip clearTimeout, leaving the abort timer (and its
+		// closure) alive for the full 10s on every failed request.
+		let response: Response;
+		try {
+			response = await fetch(fetchUrl, fetchOptions);
+		} finally {
+			clearTimeout(timeoutId);
+		}
 
 		if (!response.ok) {
 			throw new Error(`HTTP ${response.status}: ${response.statusText}`);
