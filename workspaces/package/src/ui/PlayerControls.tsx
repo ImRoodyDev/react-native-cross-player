@@ -397,8 +397,8 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 	return (
 		<SafeAreaView className="player-controls" style={rootStyle} onPointerMove={wakeControls} onTouchStart={wakeControls}>
 			<AnimatedView className={"player-controls-ctn"} pointerEvents={controlsVisible ? "auto" : "none"}>
-				<FocusGuide autoFocus trapFocusLeft trapFocusRight trapFocusUp className={"player-header"}>
-					<AnimatedView className={"player-header-ctn"} style={opacityStyleArr}>
+				<AnimatedView className={"player-header"}>
+					<FocusGuide trapFocusUp className={"player-header-ctn"} style={opacityStyleArr}>
 						<ControlButton
 							onPress={props.onClosePlayer}
 							icon="xmark"
@@ -410,8 +410,8 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 						/>
 						<Text className={"only-landscape player-title"}>{props.videoTitle}</Text>
 						{HeaderRightElement}
-					</AnimatedView>
-				</FocusGuide>
+					</FocusGuide>
+				</AnimatedView>
 
 				<View className={"player-actions"}>
 					{state.type !== "idle" && (
