@@ -358,6 +358,12 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 		Platform.isTV
 	);
 
+	const animOpacityStyle = useAnimatedStyle(() => ({
+		opacity: visibilityOpacity.value
+	}));
+
+	// Memoized style arrays/objects: inline literals re-render the (expensive) CssInterop/Animated
+	// wrappers below on every pass.
 	const safeStyle = useMemo(
 		() => ({
 			paddingTop: insets.top,
@@ -365,22 +371,15 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 		}),
 		[insets, sizes.sidePadding]
 	);
-
-	const opacityStyle = useAnimatedStyle(() => ({
-		opacity: visibilityOpacity.value
-	}));
-
-	// Memoized style arrays/objects: inline literals re-render the (expensive) CssInterop/Animated
-	// wrappers below on every pass.
 	const rootStyle = useMemo(() => [StyleSheet.absoluteFill, safeStyle], [safeStyle]);
-	const opacityStyleArr = useMemo(() => [opacityStyle], [opacityStyle]);
 	const statusHiddenStyle = useMemo(() => (state.type !== "idle" ? ({ pointerEvents: "none", opacity: 0 } as const) : undefined), [state.type]);
 	const menusStyle = useMemo(
-		() => [opacityStyle, { pointerEvents: Platform.OS === "web" || state.type !== "idle" ? ("none" as const) : ("box-none" as const) }],
-		[opacityStyle, state.type]
+		() => [animOpacityStyle, { pointerEvents: Platform.OS === "web" || state.type !== "idle" ? ("none" as const) : ("box-none" as const) }],
+		[animOpacityStyle, state.type]
 	);
-	const progressStyle = useMemo(() => [opacityStyle, { height: sizes.span6 - 2 }], [opacityStyle, sizes.span6]);
-	const sliderStyle = useMemo(() => ({ height: sizes.h1 }), [sizes.h1]);
+	const progressStyle = useMemo(() => [animOpacityStyle, { height: sizes.span6 - 2 }], [animOpacityStyle, sizes.span6]);
+	const sliderStyle = useMemo(() => ({ height: sizes.h1, borderRadius: 999999 }), [sizes.h1]);
+	const sliderContainerStyle = useMemo(() => ({ borderRadius: 999999 }), [sizes.h1]);
 	const sliderTheme = useMemo(
 		() => ({
 			minimumTrackTintColor: sky[500],
@@ -397,8 +396,8 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 	return (
 		<SafeAreaView className="player-controls" style={rootStyle} onPointerMove={wakeControls} onTouchStart={wakeControls}>
 			<AnimatedView className={"player-controls-ctn"} pointerEvents={controlsVisible ? "auto" : "none"}>
-				<AnimatedView className={"player-header"}>
-					<FocusGuide trapFocusUp className={"player-header-ctn"} style={opacityStyleArr}>
+				<FocusGuide trapFocusUp trapFocusLeft trapFocusRight className={"player-header"}>
+					<AnimatedView className={"player-header-ctn"} style={animOpacityStyle}>
 						<ControlButton
 							onPress={props.onClosePlayer}
 							icon="xmark"
@@ -410,8 +409,8 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 						/>
 						<Text className={"only-landscape player-title"}>{props.videoTitle}</Text>
 						{HeaderRightElement}
-					</FocusGuide>
-				</AnimatedView>
+					</AnimatedView>
+				</FocusGuide>
 
 				<View className={"player-actions"}>
 					{state.type !== "idle" && (
@@ -498,7 +497,9 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 						disableTapEvent={false}
 						// Styling
 						thumbTouchSize={sizes.span1}
+						thumbWidth={sizes.span4}
 						sliderHeight={Platform.isTV ? sizes.span6 : sizes.span6 - 2}
+						containerStyle={sliderContainerStyle}
 						style={sliderStyle}
 						theme={sliderTheme}
 						bubbleTextStyle={bubbleTextStyle}
@@ -506,7 +507,7 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 				</AnimatedView>
 
 				<FocusGuide autoFocus trapFocusLeft trapFocusRight trapFocusDown className={"player-buttons"}>
-					<AnimatedView className={"player-buttons-ctn"} style={opacityStyleArr}>
+					<AnimatedView className={"player-buttons-ctn"} style={animOpacityStyle}>
 						<ControlButton
 							ref={setPlayButton}
 							onPress={togglePlay}
