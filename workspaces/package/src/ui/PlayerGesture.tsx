@@ -1,6 +1,6 @@
 import { forwardRef, memo, useCallback, useEffect, useImperativeHandle } from "react";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, { Easing, useSharedValue, withDelay, withSequence, withSpring, withTiming } from "react-native-reanimated";
+import Animated, { Easing, runOnJS, useSharedValue, withDelay, withSequence, withSpring, withTiming } from "react-native-reanimated";
 
 // Internal imports
 import { Icons, IconType } from "../constants/icons";
@@ -55,8 +55,9 @@ const PlayerGesture = forwardRef<PlayerGestureRef, Props>((props, ref) => {
 	const doubleTap = Gesture.Tap()
 		.numberOfTaps(props.tap || 2)
 		.onStart(() => {
-			props.onPress();
-			animateTouch();
+			"worklet";
+			runOnJS(props.onPress)();
+			runOnJS(animateTouch)();
 		});
 
 	useImperativeHandle(ref, () => ({

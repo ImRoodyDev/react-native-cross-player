@@ -366,6 +366,7 @@
 .player-header {
 	width: 100%;
 	height: auto;
+	z-index: 3;
 }
 .player-header-ctn {
 	width: 100%;
@@ -401,6 +402,7 @@
 	align-items: center;
 
 	overflow: visible;
+	z-index: 1;
 }
 
 .player-status-overlay {
@@ -437,6 +439,7 @@
 .player-buttons {
 	width: 100%;
 	height: auto;
+	z-index: 3;
 }
 
 .player-buttons-ctn {
