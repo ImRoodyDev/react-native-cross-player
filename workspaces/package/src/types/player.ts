@@ -9,6 +9,36 @@ export type QualityLevel = {
 	name: string;
 };
 
+/**
+ * Stage the player had reached when a source failed.
+ * - `initialize`   — failed while preparing the very first source.
+ * - `source-change`— failed while switching to a source; it never started playing.
+ * - `playback`     — the native player or hls.js reported an error on a loaded source.
+ */
+export type PlayerErrorPhase = "initialize" | "source-change" | "playback";
+
+/**
+ * A playback failure reported to the host.
+ *
+ * Exists so a host that keeps several alternative links for the same media can move on
+ * the moment one is rejected, instead of inferring it from a "no progress yet" timeout.
+ * `fatal` is the signal to act on: non-fatal hls.js errors are recoverable and the
+ * player keeps trying on its own.
+ */
+export type PlayerError = {
+	phase: PlayerErrorPhase;
+	/** Index into `videoSources`, or `-1` when the failure predates source selection. */
+	sourceIndex: number;
+	/** Id of the failing source, when one was selected. */
+	sourceId?: string | number;
+	/** `true` when the source is unusable and the host should switch away from it. */
+	fatal: boolean;
+	/** Human-readable summary, already localized where the player had a message for it. */
+	message: string;
+	/** Underlying error or native/hls.js event payload, for logging. */
+	cause?: unknown;
+};
+
 /*
  * Represents a single audio track discovered from the media at load time.
  * - `id` maps to the HLS audioTrack index or the native video track index.

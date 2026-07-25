@@ -190,8 +190,70 @@ See `src/hooks/usePlayerController.ts` for full typings and runtime options. Key
     <td><code>() =&gt; void</code></td>
     <td>Called when the active media finishes playback.</td>
   </tr>
+  <tr>
+    <td><code>onError?</code></td>
+    <td><code>(error: PlayerError) =&gt; void</code></td>
+    <td>Called when a source fails while preparing, while switching, or during playback. The player still shows its own error state; this only reports it. Act on <code>fatal</code> only.</td>
+  </tr>
 </tbody>
 </table>
+
+### `PlayerError`
+
+Reported through `onError`. Lets a host that holds several alternative links for the same
+media switch away the moment one is rejected, rather than inferring failure from a
+"no playback yet" timeout.
+
+<table>
+<thead>
+  <tr>
+    <th>Field</th>
+    <th>Type</th>
+    <th>Description</th>
+  </tr>
+</thead>
+<tbody>
+  <tr>
+    <td><code>phase</code></td>
+    <td><code>"initialize" | "source-change" | "playback"</code></td>
+    <td>Stage reached when the source failed. The first two mean it never played at all.</td>
+  </tr>
+  <tr>
+    <td><code>sourceIndex</code></td>
+    <td><code>number</code></td>
+    <td>Index into <code>videoSources</code>, or <code>-1</code> when the failure predates source selection.</td>
+  </tr>
+  <tr>
+    <td><code>sourceId?</code></td>
+    <td><code>string | number</code></td>
+    <td>Id of the failing source, when one was selected.</td>
+  </tr>
+  <tr>
+    <td><code>fatal</code></td>
+    <td><code>boolean</code></td>
+    <td><code>true</code> when the source is unusable. Non-fatal hls.js errors are recoverable and retried internally — switching away on those abandons a healthy source.</td>
+  </tr>
+  <tr>
+    <td><code>message</code></td>
+    <td><code>string</code></td>
+    <td>Human-readable summary, localized where the player had a message for it.</td>
+  </tr>
+  <tr>
+    <td><code>cause?</code></td>
+    <td><code>unknown</code></td>
+    <td>Underlying error or native/hls.js event payload, for logging.</td>
+  </tr>
+</tbody>
+</table>
+
+```tsx
+<VideoPlayer
+  onError={(error) => {
+    if (error.fatal) switchToNextSource(error.sourceIndex);
+  }}
+  // ...
+/>
+```
 
 ### `VideoPlayerRef`
 

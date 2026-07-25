@@ -26,7 +26,9 @@ import { PlayerControlsRef } from "../ui/PlayerControls";
 import { useFullscreen } from "./useFullscreen";
 import { t } from "../libs/localization";
 import { isCustomPlayerError } from "../libs/error";
-import { AudioTrack, PlayerControllerState, PlayerState, QualityLevel } from "../types/player";
+import { AudioTrack, PlayerControllerState, PlayerError, PlayerErrorPhase, PlayerState, QualityLevel } from "../types/player";
+
+export type { PlayerError, PlayerErrorPhase } from "../types/player";
 import { isValidTime } from "../utils/helpers";
 import { isRemoteWebURL } from "../utils/detectors";
 
@@ -122,6 +124,15 @@ export type PlayerControllerProps = {
 	onLazyLoadSource?: (source: VideoSource) => Promise<VideoSourceWithoutId | void>;
 
 	/**
+	 * Called whenever a source fails, at any stage — while preparing, while switching, or
+	 * during playback. The player still shows its own error state; this only reports it.
+	 *
+	 * A host holding alternative links for the same media can switch on `fatal` instead of
+	 * waiting for a "still no playback" timeout to expire.
+	 */
+	onPlaybackError?: (error: PlayerError) => void;
+
+	/**
 	 * Preserve current playback time when switching sources (default true).
 	 */
 	preservePlaybackOnSourceChange?: boolean;
@@ -170,7 +181,8 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 		startPosition = 0,
 		lazyLoadSources = true,
 		preservePlaybackOnSourceChange = true,
-		onLazyLoadSource
+		onLazyLoadSource,
+		onPlaybackError
 	} = props;
 
 	// Identity-stable views of the source lists — everything below (effects, memos, controls) keys
@@ -204,6 +216,44 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 	const [audioId, setAudioId] = useState<number>(-1); // Active audio track id
 	const [isLive, setIsLive] = useState<boolean>(false); // Whether the current media is live
 	const [nativeVideoProps, setNativeVideoProps] = useState<ReactVideoProps>();
+
+	// Error reporting reads through refs on purpose: the emitters below are dependency-free
+	// callbacks (see onError), and pulling the host handler into their deps would churn the
+	// props handed to <Video> on every host re-render.
+	const onPlaybackErrorRef = useRef(onPlaybackError);
+	const sourceIdRef = useRef<string | number>(-1);
+	const videoSourcesRef = useRef(videoSources);
+	useEffect(() => {
+		onPlaybackErrorRef.current = onPlaybackError;
+		sourceIdRef.current = sourceId;
+		videoSourcesRef.current = videoSources;
+	});
+
+	/** Reports a source failure to the host. The player's own error UI is unaffected. */
+	const reportPlaybackError = useCallback(
+		(phase: PlayerErrorPhase, message: string, options?: { fatal?: boolean; cause?: unknown; sourceIndex?: number }) => {
+			const handler = onPlaybackErrorRef.current;
+			if (!handler) return;
+
+			const sources = videoSourcesRef.current;
+			const sourceIndex = options?.sourceIndex ?? sources.findIndex((video) => video.id === sourceIdRef.current);
+
+			try {
+				handler({
+					phase,
+					sourceIndex,
+					sourceId: sourceIndex >= 0 ? sources[sourceIndex]?.id : undefined,
+					fatal: options?.fatal ?? true,
+					message,
+					cause: options?.cause
+				});
+			} catch (error) {
+				// A throwing host handler must not take the player down with it.
+				CNPLogger.warn("onError handler threw:", error);
+			}
+		},
+		[]
+	);
 
 	// Fullscreen management hook
 	const { isFullscreen, onFullscreenEnter, onFullscreenExit, requestFullscreen } = useFullscreen({ videoRef, playerViewRef });
@@ -299,6 +349,12 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 				// Show error on controls
 				if (isCustomPlayerError(error)) controlsRef.current?.setControlState({ type: "error", message: error.stateMessage() });
 				else controlsRef.current?.setControlState({ type: "error", message: t("PREPARING_ERROR") });
+
+				reportPlaybackError("initialize", error instanceof Error ? error.message : t("PREPARING_ERROR"), {
+					cause: error,
+					// The initial source is the one that failed, even if it never became current.
+					sourceIndex: initialVideoSource
+				});
 			}
 		})();
 
@@ -394,6 +450,10 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 				type: "error",
 				message: [data.error.code?.toString() || "400", t("ERROR")]
 			});
+
+			reportPlaybackError("playback", data.error.errorString || data.error.localizedDescription || `Native video error ${data.error.code ?? "400"}`, {
+				cause: data
+			});
 		} else if ("type" in data) {
 			CNPLogger.warn("HLS.js Error:", data);
 			let stateMessage;
@@ -417,6 +477,13 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 					type: "error",
 					message: stateMessage
 				});
+
+			// Non-fatal hls.js errors are recoverable and hls.js retries on its own, so they are
+			// reported but flagged so the host does not switch away from a healthy source.
+			reportPlaybackError("playback", data.details ? `${data.type}: ${data.details}` : stateMessage.join(" "), {
+				fatal: data.fatal,
+				cause: data
+			});
 		}
 
 		// If a source switch is in-flight and errors, keep the last known good
@@ -425,7 +492,7 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 			blockPositionUpdatesRef.current = true;
 			sourceSwitchInFlightRef.current = false;
 		}
-	}, []);
+	}, [reportPlaybackError]);
 
 	const onBuffer = useCallback(
 		(data: OnBufferData) => {
@@ -792,6 +859,13 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 				// Show error on controls
 				if (isCustomPlayerError(error)) controlsRef.current?.setControlState({ type: "error", message: error.stateMessage() });
 				else controlsRef.current?.setControlState({ type: "error", message: t("CHANGING_SOURCE_ERROR") });
+
+				// This source never played, so the host can move on immediately — the index is
+				// the requested one, which `sourceId` has not been updated to yet.
+				reportPlaybackError("source-change", error instanceof Error ? error.message : t("CHANGING_SOURCE_ERROR"), {
+					cause: error,
+					sourceIndex
+				});
 			}
 		},
 		[
@@ -803,6 +877,7 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 			hlsSetSource,
 			destroyHls,
 			createHLS,
+			reportPlaybackError,
 			preservePlaybackOnSourceChange,
 			startPosition,
 			clearPendingSeek,

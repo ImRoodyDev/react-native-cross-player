@@ -13,6 +13,7 @@ import clsx from "clsx";
 import { State } from "../hooks/useComponentState";
 import { SliderThemeType } from "react-native-awesome-slider";
 import { SubtitleSource, VideoSource } from "../types/media";
+import { PlayerError } from "../types/player";
 
 export type VideoPlayerProps = {
 	videoTitle: string;
@@ -36,6 +37,14 @@ export type VideoPlayerProps = {
 	onPlaybackChange?: (isPlaying: boolean) => void;
 	onProgress?: (currentTime: number) => void;
 	onEnd?: () => void;
+	/**
+	 * Called when a source fails — while preparing, while switching, or during playback.
+	 * The player still renders its own error state; this only reports the failure.
+	 *
+	 * Switch away on `fatal` only: non-fatal hls.js errors are recoverable and retried
+	 * internally. See {@link PlayerError}.
+	 */
+	onError?: (error: PlayerError) => void;
 } & Pick<ControlsProps, "HeaderRightElement" | "visibilityDuration">;
 
 export type VideoPlayerRef = {
@@ -84,10 +93,13 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 
 	// Consumer callbacks read through a ref: inline props from the host would otherwise churn the
 	// identity of every handler below and defeat memo(PlayerControls).
-	const callbacksRef = React.useRef({ onControlVisibilityChange, onSourceChange, onSubtitleChange, onPlaybackChange, onProgress, onEnd, onClosePlayer: props.onClosePlayer, onNextVideo });
+	const callbacksRef = React.useRef({ onControlVisibilityChange, onSourceChange, onSubtitleChange, onPlaybackChange, onProgress, onEnd, onClosePlayer: props.onClosePlayer, onNextVideo, onError: props.onError });
 	useEffect(() => {
-		callbacksRef.current = { onControlVisibilityChange, onSourceChange, onSubtitleChange, onPlaybackChange, onProgress, onEnd, onClosePlayer: props.onClosePlayer, onNextVideo };
+		callbacksRef.current = { onControlVisibilityChange, onSourceChange, onSubtitleChange, onPlaybackChange, onProgress, onEnd, onClosePlayer: props.onClosePlayer, onNextVideo, onError: props.onError };
 	});
+
+	// Identity-stable seam for the controller, which keeps it for the player's lifetime.
+	const handlePlaybackError = useCallback((error: PlayerError) => callbacksRef.current.onError?.(error), []);
 
 	// Injects the responsive CSS variables (scaled by the TV pixel-ratio) onto the player root so
 	// every `var(--...)` in styles.css resolves on native — otherwise the whole control layout
@@ -100,7 +112,8 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 		videoRef,
 		controlsRef,
 		playerViewRef,
-		...playerConfig
+		...playerConfig,
+		onPlaybackError: handlePlaybackError
 	});
 
 	// Memoized: <Video> re-diffs (and re-sends) its props whenever handler identities change, so
