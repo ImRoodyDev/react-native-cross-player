@@ -19,6 +19,7 @@ const IMPORT_CODE = `import {
   type SubtitleSource,
   type M3U8BlobOptions,
   type SourceRequestOptions,
+  type PlayerError,
 } from 'react-native-cross-player';`;
 
 const TYPES_EXAMPLE = `const playerId = 'typed-player';
@@ -87,6 +88,8 @@ const PUBLIC_TYPES: PropRow[] = [
 	{ name: 'SourceRequestOptions', type: 'type', description: 'Proxy, headers, and native request behavior for source fetching.' },
 	{ name: 'M3U8BlobOptions', type: 'type', description: 'Input shape for building HLS master playlist text.' },
 	{ name: 'SourceTypes', type: 'enum', description: 'Detected source categories: blob, url, or native path.' },
+	{ name: 'PlayerError', type: 'type', description: 'Source failure reported through onError: phase, sourceIndex, sourceId, fatal, message, cause.' },
+	{ name: 'PlayerErrorPhase', type: 'type', description: "Stage a source reached when it failed: 'initialize' | 'source-change' | 'playback'." },
 	{ name: 'CSS_PATH', type: 'const', description: 'String path for the package CSS export.' },
 ];
 

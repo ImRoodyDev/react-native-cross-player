@@ -100,6 +100,7 @@ const VIDEO_PLAYER_PROPS: PropRow[] = [
 	{ name: 'onPlaybackChange', type: '(isPlaying) => void', description: 'Reports play/pause state changes.' },
 	{ name: 'onProgress', type: '(seconds) => void', description: 'Reports current playback time in seconds.' },
 	{ name: 'onEnd', type: '() => void', description: 'Fires when the active media ends.' },
+	{ name: 'onError', type: '(error: PlayerError) => void', description: 'Reports a source failure. Switch away only when error.fatal is true.' },
 ];
 
 const CONTROLLER_PROPS: PropRow[] = [
@@ -121,6 +122,7 @@ const CONTROLLER_PROPS: PropRow[] = [
 	{ name: 'lazyLoadSources', type: 'boolean', default: 'true', description: 'Defers source generation until selected.' },
 	{ name: 'onLazyLoadSource', type: '(source) => Promise<partial source>', description: 'Refreshes source URL, format, or options before use.' },
 	{ name: 'preservePlaybackOnSourceChange', type: 'boolean', default: 'true', description: 'Keeps playback position when switching sources.' },
+	{ name: 'onPlaybackError', type: '(error: PlayerError) => void', description: 'Reports a source failure at any stage. Exposed as onError on VideoPlayer.' },
 ];
 
 const SOURCE_PROPS: PropRow[] = [

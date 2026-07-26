@@ -155,6 +155,7 @@ const PROPS: PropRow[] = [
 	{ name: 'lazyLoadSources', type: 'boolean', default: 'true', description: 'Defers source creation until a source or subtitle is selected.' },
 	{ name: 'onLazyLoadSource', type: '(source) => Promise<partial source>', description: 'Refreshes URLs, headers, or options before a source is created.' },
 	{ name: 'preservePlaybackOnSourceChange', type: 'boolean', default: 'true', description: 'Keeps current playback time while switching source indexes.' },
+	{ name: 'onPlaybackError', type: '(error: PlayerError) => void', description: 'Reports a source failure at any stage (initialize, source-change, playback). VideoPlayer exposes this as onError.' },
 ];
 
 const RETURNED_STATE: PropRow[] = [

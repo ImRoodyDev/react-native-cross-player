@@ -260,7 +260,7 @@ What the player stabilises for you, and what it cannot:
 | `playerConfig.videoSources` / `subtitleSources` | **Yes** — compared by content, so an inline array is tolerated (it still costs a comparison every render; prefer `useMemo`). |
 | `theme` | **No** — an inline object re-renders the whole control bar. Hoist it or `useMemo` it. |
 | `HeaderRightElement` | **No** — inline JSX is a new element every render. `useMemo` it. |
-| `onClosePlayer`, `onNextVideo`, `onProgress`, `onEnd`, `onControlVisibilityChange`, … | **Yes** — read through a ref, so they are safe to pass inline. |
+| `onClosePlayer`, `onNextVideo`, `onProgress`, `onEnd`, `onError`, `onControlVisibilityChange`, … | **Yes** — read through a ref, so they are safe to pass inline. |
 
 > **Rule of thumb:** callbacks are safe to inline. Objects, arrays and JSX elements are not.
 
@@ -390,10 +390,46 @@ import { usePlayerController } from "react-native-cross-player";
     <td>No</td>
     <td>Called when playback reaches the end of the active media.</td>
   </tr>
+  <tr>
+    <td><code>onError</code></td>
+    <td><code>(error: PlayerError) =&gt; void</code></td>
+    <td>—</td>
+    <td>No</td>
+    <td>Called when a source fails while preparing, while switching, or during playback. The player still shows its own error state; this only reports it. Act on <code>fatal</code> only.</td>
+  </tr>
 </tbody>
 </table>
 
 `theme` lets you override the colors used by the built-in seek slider without replacing the controls UI.
+
+### Reacting to source failures
+
+`onError` reports a failure the moment it happens, so a host holding several alternative
+links for the same media can switch immediately instead of waiting for a "no playback yet"
+timeout. `phase` says how far the source got — `initialize` and `source-change` mean it
+never played at all, e.g. a rejected manifest.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `phase` | `"initialize" \| "source-change" \| "playback"` | Stage reached when the source failed. |
+| `sourceIndex` | `number` | Index into `videoSources`, or `-1` before a source was selected. |
+| `sourceId` | `string \| number` | Id of the failing source, when one was selected. |
+| `fatal` | `boolean` | `true` when the source is unusable. |
+| `message` | `string` | Human-readable summary, localized where available. |
+| `cause` | `unknown` | Underlying error or native/hls.js payload, for logging. |
+
+Only switch away when `fatal` is true — non-fatal hls.js errors are recoverable and retried
+internally, so treating them as failures abandons a source that is still fine.
+
+```tsx
+<VideoPlayer
+	onError={(error) => {
+		if (error.fatal) switchToNextSource(error.sourceIndex);
+	}}
+	{...rest}
+/>
+```
+
 
 ```tsx
 import { VideoPlayer } from "react-native-cross-player";

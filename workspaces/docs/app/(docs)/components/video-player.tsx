@@ -149,6 +149,28 @@ const PROXY_EXAMPLE = `const playerConfig = {
   initialVideoSource: 0,
 };`;
 
+const ERROR_HANDLING_EXAMPLE = `import { VideoPlayer, type PlayerError, type VideoPlayerRef } from 'react-native-cross-player';
+
+const playerRef = useRef<VideoPlayerRef>(null);
+const failed = useRef(new Set<number>());
+
+const handleError = useCallback((error: PlayerError) => {
+  // Recoverable hls.js errors are retried internally — don't abandon the source.
+  if (!error.fatal) return;
+
+  failed.current.add(error.sourceIndex);
+
+  // Move to the first source that has not already failed.
+  for (let step = 1; step <= sources.length; step++) {
+    const next = (error.sourceIndex + step) % sources.length;
+    if (failed.current.has(next)) continue;
+    void playerRef.current?.setVideoSource(next);
+    return;
+  }
+}, [sources.length]);
+
+<VideoPlayer ref={playerRef} onError={handleError} {...rest} />;`;
+
 const PROPS: PropRow[] = [
 	{ name: 'videoTitle', type: 'string', required: true, description: 'Title displayed in the controls header.' },
 	{ name: 'nextLabel', type: 'string', description: 'Text shown beside the next-video button when onNextVideo is provided.' },
@@ -165,6 +187,37 @@ const PROPS: PropRow[] = [
 	{ name: 'onPlaybackChange', type: '(isPlaying: boolean) => void', description: 'Fires when the paused/playing state changes.' },
 	{ name: 'onProgress', type: '(seconds: number) => void', description: 'Receives current playback time.' },
 	{ name: 'onEnd', type: '() => void', description: 'Called when the active media finishes.' },
+	{
+		name: 'onError',
+		type: '(error: PlayerError) => void',
+		description:
+			'Reports a source failure while preparing, while switching, or during playback. The player still shows its own error state. Act on error.fatal only — non-fatal hls.js errors are retried internally.',
+	},
+];
+
+const PLAYER_ERROR_PROPS: PropRow[] = [
+	{
+		name: 'phase',
+		type: "'initialize' | 'source-change' | 'playback'",
+		required: true,
+		description: 'Stage reached when the source failed. The first two mean it never played at all.',
+	},
+	{
+		name: 'sourceIndex',
+		type: 'number',
+		required: true,
+		description: 'Index into videoSources, or -1 when the failure happened before a source was selected.',
+	},
+	{ name: 'sourceId', type: 'string | number', description: 'Id of the failing source, when one was selected.' },
+	{
+		name: 'fatal',
+		type: 'boolean',
+		required: true,
+		description:
+			'True when the source is unusable. Non-fatal hls.js errors are recoverable and retried internally, so switching away on those abandons a healthy source.',
+	},
+	{ name: 'message', type: 'string', required: true, description: 'Human-readable summary, localized where the player had a message for it.' },
+	{ name: 'cause', type: 'unknown', description: 'Underlying error or native/hls.js event payload, for logging.' },
 ];
 
 const CONFIG_PROPS: PropRow[] = [
@@ -258,6 +311,28 @@ export default function VideoPlayerPage() {
 				{
 					title: 'playerConfig props',
 					content: <PropsTable props={CONFIG_PROPS} />,
+				},
+				{
+					title: 'Handling source failures',
+					content: (
+						<View className="gap-3">
+							<BodyText>
+								`onError` fires whenever a source fails — while preparing the first one, while switching to another, or
+								during playback. A host that holds several alternative links for the same media can switch on the spot
+								instead of waiting for a &quot;no playback yet&quot; timeout to expire.
+							</BodyText>
+							<Callout type="warning">
+								Only switch away when `fatal` is true. Non-fatal hls.js errors are recoverable and retried internally, so
+								treating them as failures abandons a source that is still fine.
+							</Callout>
+							<CodeBlock code={ERROR_HANDLING_EXAMPLE} language="tsx" />
+							<BodyText>
+								`phase` tells you how far the source got. `initialize` and `source-change` mean it never played at all —
+								a rejected manifest, for instance — so those are safe to fail fast on.
+							</BodyText>
+							<PropsTable props={PLAYER_ERROR_PROPS} />
+						</View>
+					),
 				},
 			]}
 		/>
