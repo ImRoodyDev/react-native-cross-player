@@ -421,7 +421,7 @@
 	position: absolute;
 	bottom: 0;
 	right: var(--side-padding);
-	overflow: visible;
+	overflow: hidden;
 	z-index: 3;
 }
 
