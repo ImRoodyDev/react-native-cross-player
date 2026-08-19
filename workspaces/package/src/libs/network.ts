@@ -1,6 +1,7 @@
 import {ProxyURLResolverCallback} from "../types/hls";
 import {SubtitleSource} from "../types/media";
 import {detectSubtitleEncoding} from "../utils/detectors";
+import {appendQueryParams} from "../utils/helpers";
 import {CNPLogger} from "../utils/logger";
 
 const CHARSET_EXP = /charset=([^;,\s]+)/i;
@@ -13,12 +14,21 @@ const CHARSET_EXP = /charset=([^;,\s]+)/i;
 export async function fetchSubtitleTrackRawData(track: SubtitleSource, proxyResolver?: ProxyURLResolverCallback): Promise<string | null> {
 	// if source is an blob skip using proxy
 	const isBlob = track.source.startsWith("blob:");
-	const fetchUrl =
-		track.options?.useProxy && !isBlob && proxyResolver
-			? proxyResolver(track.source, track.options?.overrideProxyURL ?? "", track.options?.headers || {})
+	const opts = track.options;
+	const useProxy = !!opts?.useProxy && !isBlob;
+	const resolved =
+		useProxy && proxyResolver
+			? proxyResolver(track.source, opts?.overrideProxyURL ?? "", opts?.headers || {})
 			: track.source;
+	// Proxy on: origin headers are encoded into the resolved URL, so the request to the
+	// proxy carries only the proxy-auth headers (+ ?token). Proxy off: the request goes to
+	// the origin, so it carries the origin headers.
+	const fetchUrl = useProxy ? appendQueryParams(resolved, opts?.proxyQuery) : resolved;
+	const fetchInit: RequestInit = {
+		headers: useProxy ? opts?.proxyHeaders || {} : opts?.headers || {}
+	};
 
-	const response = await fetch(fetchUrl);
+	const response = await fetch(fetchUrl, fetchInit);
 	if (!response.ok) throw new Error(`Failed to fetch subtitle from ${fetchUrl}`);
 
 	let charset = "utf-8";
@@ -67,23 +77,34 @@ export async function fetchSource(
 		useProxy: boolean;
 		proxyURL: string;
 		proxyResolver?: ProxyURLResolverCallback;
+		/** The origin's headers (Referer/User-Agent). Passed to the resolver and sent as
+		 *  real request headers (native can set them, unlike a browser). */
+		originHeaders?: Record<string, string>;
+		/** Auth to the proxy itself — real request headers. */
 		proxyHeaders?: Record<string, string>;
+		/** Auth to the proxy itself — query params appended to the proxied URL. */
+		proxyQuery?: Record<string, string>;
 	}
 ): Promise<Response> {
 	try {
 		// if source is an blob skip using proxy
 		const isBlob = source.startsWith("blob:");
-		const fetchUrl =
-			options?.useProxy && !isBlob && options.proxyResolver
-				? options.proxyResolver(source, options.proxyURL, options?.proxyHeaders || {})
+		const useProxy = !!options?.useProxy && !isBlob;
+		const resolved =
+			useProxy && options?.proxyResolver
+				? options.proxyResolver(source, options.proxyURL, options?.originHeaders || {})
 				: source;
+		const fetchUrl = useProxy ? appendQueryParams(resolved, options?.proxyQuery) : resolved;
 
 		const controller = new AbortController();
 		const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
 		const fetchOptions: RequestInit = {
 			signal: controller.signal,
-			headers: options?.useProxy && !isBlob ? options.proxyHeaders : {}
+			// Proxy on: the request goes to the PROXY and the origin headers are already in the
+			// resolved URL, so carry only the proxy-auth headers. Proxy off: the request goes to
+			// the ORIGIN, so carry the origin headers (native can set them, unlike a browser).
+			headers: useProxy ? options?.proxyHeaders || {} : options?.originHeaders || {}
 		};
 
 		// finally: a rejected fetch used to skip clearTimeout, leaving the abort timer (and its

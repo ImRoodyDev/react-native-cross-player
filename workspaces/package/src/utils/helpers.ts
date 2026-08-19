@@ -57,6 +57,18 @@ export function isAbsoluteURL(u: string): boolean {
 }
 
 /**
+ * Append query params to a URL, choosing `?` or `&` automatically. Used to attach
+ * proxy-auth query (e.g. a `token`) to a resolved proxy URL. Returns the URL
+ * unchanged when there are no params.
+ */
+export function appendQueryParams(url: string, params?: Record<string, string>): string {
+	const entries = Object.entries(params || {});
+	if (entries.length === 0) return url;
+	const sep = url.includes("?") ? "&" : "?";
+	return `${url}${sep}${entries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join("&")}`;
+}
+
+/**
  * Format time in seconds to HH:MM:SS or MM:SS format.
  * @param totalSeconds The total time in seconds.
  * @return Formatted time string.

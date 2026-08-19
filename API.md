@@ -92,7 +92,15 @@ See `src/hooks/usePlayerController.ts` for full typings and runtime options. Key
 ## `HlsProxy` and HLS helpers
 
 - `HlsProxy` extends `hls.js` to include runtime proxy manager control.
-- Methods: `setSource(url, options?, startTime?)`, `setProxyTunnelURL`, `setProxyTunnelHeaders`, `runDestroy`, etc.
+- Methods: `setSource(url, options?, startTime?)`, `setProxyURL`, `setProxyURLResolver`,
+  `setOriginHeaders`, `setProxyHeaders`, `setProxyQuery`, `runDestroy`, etc.
+- Three request-shaping channels on `SourceRequestOptions`:
+  - `headers` — the **origin's** headers (Referer/User-Agent); encoded into the proxied URL by the
+    resolver (browsers block setting these as real request headers).
+  - `proxyHeaders` — auth to the **proxy** (token/api-key), sent as real request headers.
+  - `proxyQuery` — auth to the **proxy**, appended as query params to the proxied URL.
+  - `proxyHeaders`/`proxyQuery` are only ever sent when `useProxy` is true, so a proxy token never
+    leaks to a direct origin.
 
 ## `controllers` and helpers
 

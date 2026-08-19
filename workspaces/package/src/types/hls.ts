@@ -7,18 +7,26 @@
  */
 import { FragmentLoaderContext, HlsConfig, Loader, LoaderContext, PlaylistLoaderContext } from "hls.js";
 
-export type ProxyURLResolverCallback = (targetURL: string, proxyURL: string, headers: Record<string, string>) => string;
+/** Builds the final proxied URL. `originHeaders` are the target's required headers
+ *  (Referer/User-Agent/…), to be encoded into the URL by the resolver. */
+export type ProxyURLResolverCallback = (targetURL: string, proxyURL: string, originHeaders: Record<string, string>) => string;
 
 export interface IHlsProxyManager {
 	isProxyEnabled(): boolean;
 	enableProxyLoader(enabled: boolean): void;
-	setProxyTunnelURL(url: string): void;
-	setProxyTunnelHeaders(headers: Record<string, string>): void;
-	setProxyTunnelURLResolver(resolver: ProxyURLResolverCallback): void;
+	setProxyURL(url: string): void;
+	setProxyURLResolver(resolver: ProxyURLResolverCallback): void;
+	/** Origin headers (Referer/User-Agent/…) — encoded into the proxied URL by the resolver. */
+	setOriginHeaders(headers: Record<string, string>): void;
+	/** Auth headers sent to the proxy as real request headers. */
+	setProxyHeaders(headers: Record<string, string>): void;
+	/** Auth query params appended to every proxied URL. */
+	setProxyQuery(query: Record<string, string>): void;
 
 	resolveURL(url: string): string;
-	getProxyTunnelURL(): string | null;
-	getProxyTunnelHeaders(): Record<string, string>;
+	getProxyURL(): string | null;
+	/** Auth headers for the current proxied request (empty when proxying is off). */
+	getProxyHeaders(): Record<string, string>;
 }
 
 /*

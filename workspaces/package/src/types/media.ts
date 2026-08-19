@@ -80,9 +80,24 @@ export type SubtitleBlobOptions = {
  * - `useProxy` and `overrideProxyURL` influence `fetchSource` behavior.
  */
 export type SourceRequestOptions = {
+	/**
+	 * The ORIGIN's required headers (e.g. `Referer`, `User-Agent`). On web these can't be
+	 * set as real request headers (browsers block `Referer`/`User-Agent`), so they're
+	 * encoded into the proxied URL by the resolver.
+	 */
+	headers?: Record<string, string>;
 	useProxy: boolean;
 	overrideProxyURL?: string;
-	headers?: Record<string, string>;
+	/**
+	 * Credentials for authenticating to the PROXY itself — kept separate from `headers`.
+	 * Only sent when `useProxy` is true, and only to the proxy (never a direct origin).
+	 * Use for a proxy access token or API key.
+	 * - `proxyHeaders`: attached as real request headers to every proxied request.
+	 * - `proxyQuery`: appended as query params to every proxied URL (works even where
+	 *   custom request headers are awkward, e.g. HLS segment loads).
+	 */
+	proxyHeaders?: Record<string, string>;
+	proxyQuery?: Record<string, string>;
 	nativeSendHeadersOnSourceRequest?: boolean; // For native platforms to send headers on source request
 };
 
