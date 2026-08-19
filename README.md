@@ -1,5 +1,5 @@
 <div align="center">
-<img src="https://raw.githubusercontent.com/ImRoodyDev/react-native-cross-player/refs/heads/beta-v1/cnt.svg" width="120" alt="Grabit Engine" />
+<img src="https://raw.githubusercontent.com/ImRoodyDev/react-native-cross-player/refs/heads/main/workspaces/design/cnt.svg" width="120" alt="Grabit Engine" />
 <h1>React Native Cross Player</h1>
 
 ![npm](https://img.shields.io/npm/v/react-native-cross-player?label=npm%20package&color=blue)
@@ -41,14 +41,14 @@ This library uses NativeWind v4 for styling. You must set up NativeWind in your 
 
 ```css
 /* Option 1: In your global.css or app.css */
-@import "react-native-cross-player/styles.css";
+@import 'react-native-cross-player/styles.css';
 ```
 
 Or import directly in your entry file (e.g., with Metro Web / Expo Web):
 
 ```tsx
 // In your App.tsx or _layout.tsx
-import "react-native-cross-player/styles.css";
+import 'react-native-cross-player/styles.css';
 ```
 
 **For Native (iOS/Android):** The styles are applied via NativeWind's className processing. Make sure your `babel.config.js` includes:
@@ -79,24 +79,24 @@ module.exports = withNativeWind(config, { input: './global.css' });
 Basic usage in a React Native app:
 
 ```tsx
-import React from "react";
-import { VideoPlayer } from "react-native-cross-player";
+import React from 'react';
+import { VideoPlayer } from 'react-native-cross-player';
 
 export default function App() {
-	const playerId = "demo-player";
+	const playerId = 'demo-player';
 	const playerConfig = {
 		playerId,
 		videoSources: [
 			{
-				id: "main",
+				id: 'main',
 				playerId,
-				label: "Main stream",
-				source: "https://example.com/video.m3u8",
-				format: "m3u8"
-			}
+				label: 'Main stream',
+				source: 'https://example.com/video.m3u8',
+				format: 'm3u8',
+			},
 		],
 		subtitleSources: [],
-		initialVideoSource: 0
+		initialVideoSource: 0,
 	};
 
 	return (
@@ -105,10 +105,10 @@ export default function App() {
 			playerConfig={playerConfig}
 			viewStyle={{ flex: 1 }}
 			theme={{
-				minimumTrackTintColor: "#0ea5e9",
-				maximumTrackTintColor: "#3f3f46",
-				cacheTrackTintColor: "#71717a",
-				bubbleBackgroundColor: "#0ea5e9"
+				minimumTrackTintColor: '#0ea5e9',
+				maximumTrackTintColor: '#3f3f46',
+				cacheTrackTintColor: '#71717a',
+				bubbleBackgroundColor: '#0ea5e9',
 			}}
 		/>
 	);
@@ -118,7 +118,7 @@ export default function App() {
 You can also import the controls separately:
 
 ```tsx
-import { VideoPlayer, PlayerControls } from "react-native-cross-player";
+import { VideoPlayer, PlayerControls } from 'react-native-cross-player';
 ```
 
 ## Build your own video player
@@ -134,12 +134,12 @@ The custom-player flow is:
 - Render your own UI, or reuse the exported `PlayerControls` overlay.
 
 ```tsx
-import React from "react";
-import { Pressable, Text, View } from "react-native";
-import Video from "react-native-video";
-import { PlayerControls, usePlayerController } from "react-native-cross-player";
+import React from 'react';
+import { Pressable, Text, View } from 'react-native';
+import Video from 'react-native-video';
+import { PlayerControls, usePlayerController } from 'react-native-cross-player';
 
-const playerId = "custom-player";
+const playerId = 'custom-player';
 
 export function CustomPlayer() {
 	const videoRef = React.useRef(null);
@@ -153,19 +153,19 @@ export function CustomPlayer() {
 		playerViewRef,
 		videoSources: [
 			{
-				id: "main",
+				id: 'main',
 				playerId,
-				label: "Main stream",
-				source: "https://tears-of-steel-subtitles.s3.amazonaws.com/tos.mp4",
-				format: "mp4"
-			}
+				label: 'Main stream',
+				source: 'https://tears-of-steel-subtitles.s3.amazonaws.com/tos.mp4',
+				format: 'mp4',
+			},
 		],
 		subtitleSources: [],
-		initialVideoSource: 0
+		initialVideoSource: 0,
 	});
 
 	return (
-		<View ref={playerViewRef} style={{ flex: 1, backgroundColor: "black" }}>
+		<View ref={playerViewRef} style={{ flex: 1, backgroundColor: 'black' }}>
 			<Video
 				ref={videoRef}
 				{...controller.nativeVideoProps}
@@ -176,7 +176,7 @@ export function CustomPlayer() {
 			/>
 
 			<Pressable onPress={() => controller.controls.setPause(!controller.playerState.paused)}>
-				<Text>{controller.playerState.paused ? "Play" : "Pause"}</Text>
+				<Text>{controller.playerState.paused ? 'Play' : 'Pause'}</Text>
 			</Pressable>
 
 			<PlayerControls
@@ -199,14 +199,14 @@ The control bar is a large tree — buttons, dropdowns, scrubber, focus guides �
 
 ```tsx
 <VideoPlayer
-  videoTitle="Big Buck Bunny"
-  playerConfig={{
-    playerId: 'player',
-    videoSources: [{ id: 'main', playerId: 'player', label: 'Main', source: url, format: 'mp4' }],
-    initialVideoSource: 0,
-  }}
-  theme={{ minimumTrackTintColor: '#38bdf8' }}
-  HeaderRightElement={<MuteButton muted={muted} />}
+	videoTitle="Big Buck Bunny"
+	playerConfig={{
+		playerId: 'player',
+		videoSources: [{ id: 'main', playerId: 'player', label: 'Main', source: url, format: 'mp4' }],
+		initialVideoSource: 0,
+	}}
+	theme={{ minimumTrackTintColor: '#38bdf8' }}
+	HeaderRightElement={<MuteButton muted={muted} />}
 />
 ```
 
@@ -218,28 +218,28 @@ This looks harmless, and it is the most common cause of player jank: any state c
 const THEME = { minimumTrackTintColor: '#38bdf8' }; // hoisted — never changes
 
 function Page() {
-  const videoSources = React.useMemo(
-    () => [{ id: 'main', playerId: 'player', label: 'Main', source: url, format: 'mp4' }],
-    [url],
-  );
-  const playerConfig = React.useMemo(
-    () => ({ playerId: 'player', videoSources, initialVideoSource: 0 }),
-    [videoSources],
-  );
-  const headerRight = React.useMemo(() => <MuteButton muted={muted} />, [muted]);
+	const videoSources = React.useMemo(
+		() => [{ id: 'main', playerId: 'player', label: 'Main', source: url, format: 'mp4' }],
+		[url],
+	);
+	const playerConfig = React.useMemo(
+		() => ({ playerId: 'player', videoSources, initialVideoSource: 0 }),
+		[videoSources],
+	);
+	const headerRight = React.useMemo(() => <MuteButton muted={muted} />, [muted]);
 
-  return <VideoPlayer playerConfig={playerConfig} theme={THEME} HeaderRightElement={headerRight} />;
+	return <VideoPlayer playerConfig={playerConfig} theme={THEME} HeaderRightElement={headerRight} />;
 }
 ```
 
 What the player stabilises for you, and what it cannot:
 
-| Prop | Stabilised? |
-| --- | --- |
-| `playerConfig.videoSources` / `subtitleSources` | **Yes** — compared by content, so an inline array is tolerated (it still costs a comparison every render; prefer `useMemo`). |
-| `theme` | **No** — an inline object re-renders the whole control bar. Hoist it or `useMemo` it. |
-| `HeaderRightElement` | **No** — inline JSX is a new element every render. `useMemo` it. |
-| `onClosePlayer`, `onNextVideo`, `onProgress`, `onEnd`, `onError`, `onControlVisibilityChange`, … | **Yes** — read through a ref, so they are safe to pass inline. |
+| Prop                                                                                             | Stabilised?                                                                                                                  |
+| ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| `playerConfig.videoSources` / `subtitleSources`                                                  | **Yes** — compared by content, so an inline array is tolerated (it still costs a comparison every render; prefer `useMemo`). |
+| `theme`                                                                                          | **No** — an inline object re-renders the whole control bar. Hoist it or `useMemo` it.                                        |
+| `HeaderRightElement`                                                                             | **No** — inline JSX is a new element every render. `useMemo` it.                                                             |
+| `onClosePlayer`, `onNextVideo`, `onProgress`, `onEnd`, `onError`, `onControlVisibilityChange`, … | **Yes** — read through a ref, so they are safe to pass inline.                                                               |
 
 > **Rule of thumb:** callbacks are safe to inline. Objects, arrays and JSX elements are not.
 
@@ -267,7 +267,7 @@ This library exports both higher-level UI components (`VideoPlayer`, `PlayerCont
 `usePlayerController` is exported from the package entry so consumers can import it directly:
 
 ```ts
-import { usePlayerController } from "react-native-cross-player";
+import { usePlayerController } from 'react-native-cross-player';
 ```
 
 ### `VideoPlayer` props (detailed)
@@ -388,14 +388,14 @@ links for the same media can switch immediately instead of waiting for a "no pla
 timeout. `phase` says how far the source got — `initialize` and `source-change` mean it
 never played at all, e.g. a rejected manifest.
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `phase` | `"initialize" \| "source-change" \| "playback"` | Stage reached when the source failed. |
-| `sourceIndex` | `number` | Index into `videoSources`, or `-1` before a source was selected. |
-| `sourceId` | `string \| number` | Id of the failing source, when one was selected. |
-| `fatal` | `boolean` | `true` when the source is unusable. |
-| `message` | `string` | Human-readable summary, localized where available. |
-| `cause` | `unknown` | Underlying error or native/hls.js payload, for logging. |
+| Field         | Type                                            | Description                                                      |
+| ------------- | ----------------------------------------------- | ---------------------------------------------------------------- |
+| `phase`       | `"initialize" \| "source-change" \| "playback"` | Stage reached when the source failed.                            |
+| `sourceIndex` | `number`                                        | Index into `videoSources`, or `-1` before a source was selected. |
+| `sourceId`    | `string \| number`                              | Id of the failing source, when one was selected.                 |
+| `fatal`       | `boolean`                                       | `true` when the source is unusable.                              |
+| `message`     | `string`                                        | Human-readable summary, localized where available.               |
+| `cause`       | `unknown`                                       | Underlying error or native/hls.js payload, for logging.          |
 
 Only switch away when `fatal` is true — non-fatal hls.js errors are recoverable and retried
 internally, so treating them as failures abandons a source that is still fine.
@@ -409,16 +409,15 @@ internally, so treating them as failures abandons a source that is still fine.
 />
 ```
 
-
 ```tsx
-import { VideoPlayer } from "react-native-cross-player";
-import type { SliderThemeType } from "react-native-awesome-slider";
+import { VideoPlayer } from 'react-native-cross-player';
+import type { SliderThemeType } from 'react-native-awesome-slider';
 
 const sliderTheme: SliderThemeType = {
-	minimumTrackTintColor: "#0ea5e9",
-	maximumTrackTintColor: "#3f3f46",
-	cacheTrackTintColor: "#71717a",
-	bubbleBackgroundColor: "#0ea5e9"
+	minimumTrackTintColor: '#0ea5e9',
+	maximumTrackTintColor: '#3f3f46',
+	cacheTrackTintColor: '#71717a',
+	bubbleBackgroundColor: '#0ea5e9',
 };
 
 <VideoPlayer videoTitle="Demo" playerConfig={playerConfig} theme={sliderTheme} />;
@@ -431,19 +430,19 @@ You can observe source and subtitle switches from the built-in UI or imperative 
 	videoTitle="Demo"
 	playerConfig={playerConfig}
 	onSourceChange={(index, source) => {
-		console.log("Active source", index, source.label);
+		console.log('Active source', index, source.label);
 	}}
 	onSubtitleChange={(index, subtitle) => {
-		console.log("Active subtitle", index, subtitle.label ?? subtitle.langISO);
+		console.log('Active subtitle', index, subtitle.label ?? subtitle.langISO);
 	}}
 	onPlaybackChange={(isPlaying) => {
-		console.log("Playback changed", isPlaying ? "playing" : "paused");
+		console.log('Playback changed', isPlaying ? 'playing' : 'paused');
 	}}
 	onProgress={(currentTime) => {
-		console.log("Current time", currentTime);
+		console.log('Current time', currentTime);
 	}}
 	onEnd={() => {
-		console.log("Playback finished");
+		console.log('Playback finished');
 	}}
 />
 ```
