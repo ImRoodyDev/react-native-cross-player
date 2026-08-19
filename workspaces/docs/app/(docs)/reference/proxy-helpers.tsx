@@ -27,8 +27,7 @@ const RESOLVER_EXAMPLE = `const resolveProxyUrl: ProxyURLResolverCallback = (tar
 
 const PLAYER_PROXY_EXAMPLE = `const playerConfig = {
   playerId: 'proxy-reference-player',
-  proxyURL: 'https://api.example.com/proxy',
-  proxyResolver: resolveProxyUrl,
+  proxyConfig: { url: 'https://api.example.com/proxy', resolver: resolveProxyUrl },
   videoSources: [
     {
       id: 'hls',
@@ -63,12 +62,14 @@ const HLS_EXAMPLE = `const hls = new HlsProxy({
   },
 });
 
-hls.setProxyTunnelURLResolver(resolveProxyUrl);
+hls.setProxyURLResolver(resolveProxyUrl);
 
 hls.setSource('https://example.com/master.m3u8', {
   useProxy: true,
   overrideProxyURL: 'https://proxy.example.com/hls',
-  headers: { Authorization: 'Bearer token' },
+  headers: { Referer: 'https://origin.example.com' }, // origin headers -> encoded into the proxied URL
+  proxyQuery: { token: 'signed-access-token' },        // proxy auth -> appended as ?token=
+  proxyHeaders: { 'X-Proxy-Token': 'signed-access-token' }, // proxy auth -> real request header
 });
 
 hls.runDestroy();`;
@@ -79,14 +80,16 @@ const HELPERS: PropRow[] = [
 	{ name: 'ProxyLoader', type: 'class', description: 'Base proxy-aware hls.js loader.' },
 	{ name: 'ProxyPlaylistLoader', type: 'class', description: 'Proxy-aware loader for playlist requests.' },
 	{ name: 'ProxyFragmentLoader', type: 'class', description: 'Proxy-aware loader for segment/fragment requests.' },
-	{ name: 'ProxyURLResolverCallback', type: '(targetURL, proxyURL, headers) => string', description: 'Callback shape used to build the final proxied URL.' },
+	{ name: 'ProxyURLResolverCallback', type: '(targetURL, proxyURL, originHeaders) => string', description: 'Callback shape used to build the final proxied URL. The 3rd arg is the origin headers to encode into the URL.' },
 	{ name: 'HlsProxyConfig', type: 'type', description: 'Configuration for enabling proxy loaders and forwarding hls.js options.' },
 ];
 
 const SOURCE_OPTIONS: PropRow[] = [
 	{ name: 'useProxy', type: 'boolean', required: true, description: 'Enables proxy resolution for a source or subtitle.' },
-	{ name: 'overrideProxyURL', type: 'string', description: 'Proxy endpoint for this item. If omitted, playerConfig.proxyURL is copied in.' },
-	{ name: 'headers', type: 'Record<string,string>', description: 'Headers passed to the resolver and optionally to native source requests.' },
+	{ name: 'overrideProxyURL', type: 'string', description: 'Proxy endpoint for this item. If omitted, playerConfig.proxyConfig.url is copied in.' },
+	{ name: 'headers', type: 'Record<string,string>', description: "The origin's required headers (Referer/User-Agent). Passed to the resolver and encoded into the proxied URL (browsers block setting these as real request headers)." },
+	{ name: 'proxyHeaders', type: 'Record<string,string>', description: 'Auth to the proxy itself (token/api-key), sent as real request headers on every proxied request. Only when useProxy is true; never sent to a direct origin.' },
+	{ name: 'proxyQuery', type: 'Record<string,string>', description: 'Auth to the proxy itself, appended as query params to every proxied URL. Use where custom headers are awkward (e.g. HLS segment loads).' },
 	{ name: 'nativeSendHeadersOnSourceRequest', type: 'boolean', default: 'false', description: 'Sends headers through react-native-video native source requests.' },
 ];
 
@@ -124,7 +127,7 @@ export default function ProxyHelpersPage() {
 					content: (
 						<View className="gap-3">
 							<BodyText>
-								For normal app usage, set `playerConfig.proxyURL`, pass `proxyResolver`, and mark only the protected
+								For normal app usage, set `playerConfig.proxyConfig` (`url` + `resolver`), and mark only the protected
 								sources with `options.useProxy`.
 							</BodyText>
 							<CodeBlock code={PLAYER_PROXY_EXAMPLE} language="ts" />

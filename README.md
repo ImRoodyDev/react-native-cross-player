@@ -191,6 +191,60 @@ export function CustomPlayer() {
 }
 ```
 
+## Performance
+
+The control bar is a large tree — buttons, dropdowns, scrubber, focus guides — and everything under `PlayerControls` is memoised, so it does nothing while you watch. But memoisation compares **prop identity, not value**. A single unstable prop from your page defeats it and re-renders the entire tree, re-resolving the styles of hundreds of views. On a TV box that is the difference between 60fps and a visibly janky control bar.
+
+**Bad — every prop here is a new object/array/element on each render:**
+
+```tsx
+<VideoPlayer
+  videoTitle="Big Buck Bunny"
+  playerConfig={{
+    playerId: 'player',
+    videoSources: [{ id: 'main', playerId: 'player', label: 'Main', source: url, format: 'mp4' }],
+    initialVideoSource: 0,
+  }}
+  theme={{ minimumTrackTintColor: '#38bdf8' }}
+  HeaderRightElement={<MuteButton muted={muted} />}
+/>
+```
+
+This looks harmless, and it is the most common cause of player jank: any state change anywhere in the page rebuilds all of those props, and the control bar re-renders with them.
+
+**Good — stable identities, so the controls re-render only on real changes:**
+
+```tsx
+const THEME = { minimumTrackTintColor: '#38bdf8' }; // hoisted — never changes
+
+function Page() {
+  const videoSources = React.useMemo(
+    () => [{ id: 'main', playerId: 'player', label: 'Main', source: url, format: 'mp4' }],
+    [url],
+  );
+  const playerConfig = React.useMemo(
+    () => ({ playerId: 'player', videoSources, initialVideoSource: 0 }),
+    [videoSources],
+  );
+  const headerRight = React.useMemo(() => <MuteButton muted={muted} />, [muted]);
+
+  return <VideoPlayer playerConfig={playerConfig} theme={THEME} HeaderRightElement={headerRight} />;
+}
+```
+
+What the player stabilises for you, and what it cannot:
+
+| Prop | Stabilised? |
+| --- | --- |
+| `playerConfig.videoSources` / `subtitleSources` | **Yes** — compared by content, so an inline array is tolerated (it still costs a comparison every render; prefer `useMemo`). |
+| `theme` | **No** — an inline object re-renders the whole control bar. Hoist it or `useMemo` it. |
+| `HeaderRightElement` | **No** — inline JSX is a new element every render. `useMemo` it. |
+| `onClosePlayer`, `onNextVideo`, `onProgress`, `onEnd`, `onError`, `onControlVisibilityChange`, … | **Yes** — read through a ref, so they are safe to pass inline. |
+
+> **Rule of thumb:** callbacks are safe to inline. Objects, arrays and JSX elements are not.
+
+**Profiling:** measure on a **release** build via [`@callstack/inspector`](https://github.com/callstackincubator/inspector). React DevTools attaches to dev builds, where every render is far slower than production — dev timings will point you at problems that do not exist in a shipped app. When you open a slow commit in the profiler, a component listed as `props changed: theme` or `props changed: resources` is an unstable prop coming from your page, not from the player.
+
 ## Public exports
 
 The package entry exports more than the ready-made components:
@@ -315,10 +369,46 @@ import { usePlayerController } from "react-native-cross-player";
     <td>No</td>
     <td>Called when playback reaches the end of the active media.</td>
   </tr>
+  <tr>
+    <td><code>onError</code></td>
+    <td><code>(error: PlayerError) =&gt; void</code></td>
+    <td>—</td>
+    <td>No</td>
+    <td>Called when a source fails while preparing, while switching, or during playback. The player still shows its own error state; this only reports it. Act on <code>fatal</code> only.</td>
+  </tr>
 </tbody>
 </table>
 
 `theme` lets you override the colors used by the built-in seek slider without replacing the controls UI.
+
+### Reacting to source failures
+
+`onError` reports a failure the moment it happens, so a host holding several alternative
+links for the same media can switch immediately instead of waiting for a "no playback yet"
+timeout. `phase` says how far the source got — `initialize` and `source-change` mean it
+never played at all, e.g. a rejected manifest.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `phase` | `"initialize" \| "source-change" \| "playback"` | Stage reached when the source failed. |
+| `sourceIndex` | `number` | Index into `videoSources`, or `-1` before a source was selected. |
+| `sourceId` | `string \| number` | Id of the failing source, when one was selected. |
+| `fatal` | `boolean` | `true` when the source is unusable. |
+| `message` | `string` | Human-readable summary, localized where available. |
+| `cause` | `unknown` | Underlying error or native/hls.js payload, for logging. |
+
+Only switch away when `fatal` is true — non-fatal hls.js errors are recoverable and retried
+internally, so treating them as failures abandons a source that is still fine.
+
+```tsx
+<VideoPlayer
+	onError={(error) => {
+		if (error.fatal) switchToNextSource(error.sourceIndex);
+	}}
+	{...rest}
+/>
+```
+
 
 ```tsx
 import { VideoPlayer } from "react-native-cross-player";
@@ -393,7 +483,14 @@ const playerConfig = {
 	subtitleSources: [],
 	initialVideoSource: -1,
 	autoStart: false,
-	proxyURL: 'https://proxy.example.com'
+	// Player-level proxy settings bundled into one object:
+	proxyConfig: {
+		url: 'https://proxy.example.com', // proxy base URL
+		resolver: (targetURL, proxyURL, originHeaders) =>
+			`${proxyURL}/${encodeURIComponent(btoa(targetURL))}`, // builds the proxied URL
+		headers: { 'X-Proxy-Token': 'my-token' }, // (optional) proxy auth as real headers
+		query: { token: 'my-token' }              // (optional) proxy auth as a query param
+	}
 };
 
 <VideoPlayer playerConfig={playerConfig} />
@@ -454,10 +551,10 @@ Key `playerConfig` fields (examples):
     <td>Seek position (seconds) applied on initial load</td>
   </tr>
   <tr>
-    <td><code>proxyURL</code></td>
-    <td><code>string</code></td>
+    <td><code>proxyConfig</code></td>
+    <td><code>{ url?, resolver?, headers?, query? }</code></td>
     <td>—</td>
-    <td>Proxy tunnel URL used for playlist and fragment requests</td>
+    <td>Player-level proxy settings applied to every proxied source: <code>url</code> (proxy base URL), <code>resolver</code> (builds the proxied URL), and optional proxy auth <code>headers</code>/<code>query</code>. A source's own <code>options</code> override per source.</td>
   </tr>
   <tr>
     <td><code>lazyLoadSources</code></td>

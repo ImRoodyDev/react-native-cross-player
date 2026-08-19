@@ -29,8 +29,11 @@ export * from "./types/media";
 
 // Hooks
 export * from "./hooks/useWebKeyboard";
+export * from "./hooks/useTVRemote";
+export * from "./hooks/useResponsiveSize";
 
 // UI Components
 export * from "./ui/VideoPlayer";
 export * from "./ui/PlayerControls";
+export * from "./ui/FocusGuide";
 export * from "./hooks/usePlayerController";

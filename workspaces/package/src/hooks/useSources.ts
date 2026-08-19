@@ -1,6 +1,6 @@
 import { Platform } from "react-native";
 import { SubtitleSource, VideoSource, VideoSourceWithoutId } from "../types/media";
-import { ProxyURLResolverCallback } from "../types/hls";
+import { ProxyConfig } from "../types/hls";
 import { createM3U8Source, createVTTSource } from "../libs/media";
 import { clearBlobGroup } from "../libs/blob";
 import React, { useCallback, useRef } from "react";
@@ -11,15 +11,17 @@ export type UseSourcesParams = {
 	videoSources?: VideoSource[];
 	subtitleSources?: SubtitleSource[];
 	lazyLoadSources?: boolean;
-	proxyURL?: string;
+	/** Player-level proxy settings applied to every proxied source (a source's own options win). */
+	proxyConfig?: ProxyConfig;
 	videoRef?: React.RefObject<VideoRef | null>;
 	playerId?: string;
-	proxyResolver?: ProxyURLResolverCallback;
 	onLazyLoadSource?: (source: VideoSource) => Promise<VideoSourceWithoutId | void>;
 };
 
 export function useSources(params: UseSourcesParams) {
-	const { videoSources = [], subtitleSources = [], lazyLoadSources = true, proxyURL, proxyResolver, onLazyLoadSource, videoRef } = params;
+	const { videoSources = [], subtitleSources = [], lazyLoadSources = true, proxyConfig, onLazyLoadSource, videoRef } = params;
+	// Unpack the bundled proxy config into the fields used below.
+	const { url: proxyURL, resolver: proxyResolver, headers: proxyHeaders, query: proxyQuery } = proxyConfig ?? {};
 
 	const [initializedVideo, setInitializedVideo] = React.useState(false);
 	const [initializedSubtitle, setInitializedSubtitle] = React.useState(false);
@@ -35,45 +37,83 @@ export function useSources(params: UseSourcesParams) {
 			};
 
 			// If the source was updated by the callback, use the updated source for proxy resolution and blob URL creation
-			if (updatedVideo.options && !updatedVideo.options.overrideProxyURL) updatedVideo.options.overrideProxyURL = proxyURL;
+			// Default ProxyURL override by source options if not already set, allowing per-source proxy URL specification
+			if (updatedVideo.options) {
+				if (!updatedVideo.options.overrideProxyURL) updatedVideo.options.overrideProxyURL = proxyURL;
+				// Player-level proxy auth as defaults; a source's own options win on key conflicts.
+				if (proxyHeaders) updatedVideo.options.proxyHeaders = { ...proxyHeaders, ...updatedVideo.options.proxyHeaders };
+				if (proxyQuery) updatedVideo.options.proxyQuery = { ...proxyQuery, ...updatedVideo.options.proxyQuery };
+			}
 
 			// Create m3u8 source for non-web platforms, otherwise resolve proxy if needed
 			if (updatedVideo.format === "m3u8" && Platform.OS !== "web" && updatedVideo.options?.useProxy) {
 				updatedVideo.source = await createM3U8Source(updatedVideo, proxyResolver).catch(() => "");
 			} else {
-				if (proxyResolver && updatedVideo.options?.useProxy)
+				// NOTE:
+				// On web resolve if we resolve the source to the proxy URL and the source is an m3u8 and it contains playlist tag with
+				// relative segments, the player will fail to load the source because it won't be able to resolve the relative segment URLs from the proxy URL.
+				// To avoid this we only resolve the proxy URL on web without transforming the source into a blob URL, allowing the player to handle the m3u8 parsing and segment loading as if it were a regular URL, while still benefiting from the proxy for CORS and other proxy-related features.
+				if (updatedVideo.format !== "m3u8" && proxyResolver && updatedVideo.options?.useProxy)
 					updatedVideo.source = proxyResolver(updatedVideo.source, proxyURL || "", updatedVideo.options?.headers || {});
+				else updatedVideo.source = video.source;
 			}
 
 			createdSourcesRef.current.set(updatedVideo.id, updatedVideo);
 		},
-		[proxyURL, proxyResolver, onLazyLoadSource]
+		[proxyURL, proxyResolver, proxyHeaders, proxyQuery, onLazyLoadSource]
 	);
 
 	const addSubtitleSource = useCallback(
 		async (subtitle: SubtitleSource) => {
-			if (subtitle.options && !subtitle.options.overrideProxyURL) subtitle.options.overrideProxyURL = proxyURL;
+			const subtitleOptions = subtitle.options
+				? {
+						...subtitle.options,
+						overrideProxyURL: subtitle.options.overrideProxyURL || proxyURL,
+						// Player-level proxy auth as defaults; the subtitle's own options win.
+						proxyHeaders: { ...(proxyHeaders || {}), ...(subtitle.options.proxyHeaders || {}) },
+						proxyQuery: { ...(proxyQuery || {}), ...(subtitle.options.proxyQuery || {}) }
+					}
+				: subtitle.options;
 
-			if (proxyResolver && subtitle.options?.useProxy) subtitle.source = proxyResolver(subtitle.source, proxyURL || "", subtitle.options?.headers || {});
+			// Idempotency: reuse an already-created blob for this id instead of minting a second one.
+			// The player init effect can run more than once: the consumer often passes an inline
+			// subtitleSources array (new identity every render) and React StrictMode double-invokes
+			// effects in dev, so without this we'd create duplicate VTT blobs for the same subtitle.
+			// `subtitle` is never mutated, so `subtitle.source` is always the pristine URL from props.
+			const existing = createdSubtitlesRef.current.get(subtitle.id);
+			const createdSubtitle = existing?.source
+				? existing
+				: ({
+						...subtitle,
+						options: subtitleOptions,
+						source: await createVTTSource({ ...subtitle, options: subtitleOptions }, proxyResolver).catch(() => "")
+					} satisfies SubtitleSource);
 
-			const source = await createVTTSource(subtitle, proxyResolver).catch(() => "");
-			subtitle.source = source;
-			createdSubtitlesRef.current.set(subtitle.id, subtitle);
+			createdSubtitlesRef.current.set(subtitle.id, createdSubtitle);
 
-			if (Platform.OS === "web" && videoRef?.current?.nativeHtmlVideoRef?.current && subtitle.source) {
-				videoRef.current.nativeHtmlVideoRef.current.appendChild(
+			if (Platform.OS === "web" && videoRef?.current?.nativeHtmlVideoRef?.current && createdSubtitle.source) {
+				const videoEl = videoRef.current.nativeHtmlVideoRef.current;
+
+				// Remove any <track> already attached for this id before appending. Appending without
+				// this produced duplicate <track> elements (same id, different blob) and doubled
+				// subtitle lines on web. Iterate a static copy since we mutate the DOM while looping.
+				Array.from(videoEl.querySelectorAll("track")).forEach((track) => {
+					if (track.id === createdSubtitle.id) videoEl.removeChild(track);
+				});
+
+				videoEl.appendChild(
 					Object.assign(document.createElement("track"), {
 						kind: "subtitles",
-						label: subtitle.label || subtitle.langISO,
-						src: subtitle.source,
-						srclang: subtitle.langISO,
+						label: createdSubtitle.label || createdSubtitle.langISO,
+						src: createdSubtitle.source,
+						srclang: createdSubtitle.langISO,
 						default: false,
-						id: subtitle.id
+						id: createdSubtitle.id
 					})
 				);
 			}
 		},
-		[proxyURL, proxyResolver, videoRef]
+		[proxyURL, proxyResolver, proxyHeaders, proxyQuery, videoRef]
 	);
 
 	const initializeVideos = useCallback(async () => {
@@ -94,6 +134,8 @@ export function useSources(params: UseSourcesParams) {
 			setInitializedSubtitle(false);
 			return;
 		}
+		// Lazy: create each subtitle's file only when first selected (like videos). A first selection
+		// may make media3 re-prepare and restart — the controller's resume logic seeks back.
 		if (!lazyLoadSources) {
 			for (const subtitle of subtitleSources) await addSubtitleSource(subtitle);
 		}

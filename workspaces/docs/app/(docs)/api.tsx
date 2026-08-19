@@ -100,6 +100,7 @@ const VIDEO_PLAYER_PROPS: PropRow[] = [
 	{ name: 'onPlaybackChange', type: '(isPlaying) => void', description: 'Reports play/pause state changes.' },
 	{ name: 'onProgress', type: '(seconds) => void', description: 'Reports current playback time in seconds.' },
 	{ name: 'onEnd', type: '() => void', description: 'Fires when the active media ends.' },
+	{ name: 'onError', type: '(error: PlayerError) => void', description: 'Reports a source failure. Switch away only when error.fatal is true.' },
 ];
 
 const CONTROLLER_PROPS: PropRow[] = [
@@ -112,8 +113,7 @@ const CONTROLLER_PROPS: PropRow[] = [
 	{ name: 'initialVideoSource', type: 'number', default: '-1', description: 'Initial source index.' },
 	{ name: 'initialSubtitleSource', type: 'number', default: '-1', description: 'Initial subtitle index.' },
 	{ name: 'initialAudioTrack', type: 'number', default: '-1', description: 'Initial audio track index after discovery.' },
-	{ name: 'proxyURL', type: 'string', description: 'Default proxy endpoint used by proxied sources and subtitles.' },
-	{ name: 'proxyResolver', type: 'ProxyURLResolverCallback', description: 'Turns target URL, proxy URL, and headers into a fetchable proxy URL.' },
+	{ name: 'proxyConfig', type: '{ url?, resolver?, headers?, query? }', description: 'Player-level proxy settings applied to every proxied source: proxy base url, resolver, and optional proxy auth headers/query. A source\'s own options override per source.' },
 	{ name: 'hlsConfig', type: 'Partial<HlsConfig>', description: 'hls.js options for web HLS playback.' },
 	{ name: 'maxResolutionHeight', type: 'number', default: 'Infinity', description: 'Filters quality levels above this height.' },
 	{ name: 'autoStart', type: 'boolean', default: 'false', description: 'Starts playback after loading.' },
@@ -121,6 +121,7 @@ const CONTROLLER_PROPS: PropRow[] = [
 	{ name: 'lazyLoadSources', type: 'boolean', default: 'true', description: 'Defers source generation until selected.' },
 	{ name: 'onLazyLoadSource', type: '(source) => Promise<partial source>', description: 'Refreshes source URL, format, or options before use.' },
 	{ name: 'preservePlaybackOnSourceChange', type: 'boolean', default: 'true', description: 'Keeps playback position when switching sources.' },
+	{ name: 'onPlaybackError', type: '(error: PlayerError) => void', description: 'Reports a source failure at any stage. Exposed as onError on VideoPlayer.' },
 ];
 
 const SOURCE_PROPS: PropRow[] = [
@@ -130,7 +131,7 @@ const SOURCE_PROPS: PropRow[] = [
 	{ name: 'source', type: 'string', required: true, description: 'Remote URL, blob URL, or native path.' },
 	{ name: 'format', type: 'VideoFormats', required: true, description: 'Format hint such as m3u8, mp4, webm, mp3, or a custom string.' },
 	{ name: 'options.useProxy', type: 'boolean', default: 'false', description: 'Routes this source through the configured proxy resolver.' },
-	{ name: 'options.overrideProxyURL', type: 'string', description: 'Per-source proxy endpoint. Falls back to playerConfig.proxyURL.' },
+	{ name: 'options.overrideProxyURL', type: 'string', description: 'Per-source proxy endpoint. Falls back to playerConfig.proxyConfig.url.' },
 	{ name: 'options.headers', type: 'Record<string,string>', description: 'Headers passed to proxy resolver and optional native source requests.' },
 	{ name: 'options.nativeSendHeadersOnSourceRequest', type: 'boolean', default: 'false', description: 'Sends options.headers directly through react-native-video native source requests.' },
 ];

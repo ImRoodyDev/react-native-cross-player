@@ -4,6 +4,7 @@ import { Parser, PlaylistItem } from "m3u8-parser";
 import { ProxyURLResolverCallback } from "../types/hls";
 import { createM3U8File, createVTTFile, readLocalFileContent } from "./blob";
 import { detectSourceType, detectSubtitleType } from "../utils/detectors";
+import { appendQueryParams } from "../utils/helpers";
 import { CNPLogger } from "../utils/logger";
 import { default as pLimit } from "p-limit";
 
@@ -77,7 +78,9 @@ type RewriteVariantsOptions = {
 	requestOptions: {
 		useProxy: boolean;
 		proxyURL: string;
-		proxyHeaders: Record<string, string>;
+		originHeaders: Record<string, string>; // the origin's headers → encoded into the proxied URL
+		proxyHeaders?: Record<string, string>; // proxy auth → real request headers
+		proxyQuery?: Record<string, string>; // proxy auth → query appended to child URLs
 		proxyResolver?: ProxyURLResolverCallback;
 	};
 };
@@ -103,7 +106,9 @@ export async function createM3U8Source(videoSource: VideoSource, proxyResolver?:
 		const requestOptions = {
 			useProxy: !!videoSource.options?.useProxy,
 			proxyURL: videoSource.options?.overrideProxyURL || "",
-			proxyHeaders: videoSource.options?.headers || {},
+			originHeaders: videoSource.options?.headers || {}, // origin's headers → encoded into the URL
+			proxyHeaders: videoSource.options?.proxyHeaders || {}, // proxy auth → real request headers
+			proxyQuery: videoSource.options?.proxyQuery || {}, // proxy auth → appended query
 			proxyResolver
 		};
 
@@ -266,7 +271,9 @@ export async function createM3U8Source(videoSource: VideoSource, proxyResolver?:
 			// Handle media playlist (no variants)
 			// Use original base URL for rewriting, not the proxy URL
 			const rewrittenMedia = rewriteM3U8URIs(playlistText, videoURL, requestOptions.useProxy, (url) =>
-				!requestOptions.proxyResolver ? url : requestOptions.proxyResolver(url, requestOptions.proxyURL, requestOptions.proxyHeaders)
+				!requestOptions.proxyResolver
+				? url
+				: appendQueryParams(requestOptions.proxyResolver(url, requestOptions.proxyURL, requestOptions.originHeaders), requestOptions.proxyQuery)
 			);
 
 			// Create media playlist file/blob
@@ -305,7 +312,9 @@ async function rewriteM3U8Variants(playlist: PlaylistItem, index: number, option
 
 		// Rewrite variant's segments using the variant's original base URL
 		const rewrittenRawSegments = rewriteM3U8URIs(rawSegments, absoluteVariantUrl, requestOptions.useProxy, (url) =>
-			!requestOptions.proxyResolver ? url : requestOptions.proxyResolver(url, requestOptions.proxyURL, requestOptions.proxyHeaders)
+			!requestOptions.proxyResolver
+				? url
+				: appendQueryParams(requestOptions.proxyResolver(url, requestOptions.proxyURL, requestOptions.originHeaders), requestOptions.proxyQuery)
 		);
 
 		// Create file/blob for this variant
@@ -358,7 +367,9 @@ async function rewriteM3U8AudioTrack(track: AudioTrackInfo, index: number, optio
 
 		// Rewrite segment URIs in the audio playlist
 		const rewrittenContent = rewriteM3U8URIs(rawContent, absoluteUrl, requestOptions.useProxy, (url) =>
-			!requestOptions.proxyResolver ? url : requestOptions.proxyResolver(url, requestOptions.proxyURL, requestOptions.proxyHeaders)
+			!requestOptions.proxyResolver
+				? url
+				: appendQueryParams(requestOptions.proxyResolver(url, requestOptions.proxyURL, requestOptions.originHeaders), requestOptions.proxyQuery)
 		);
 
 		// Create file for this audio track
@@ -555,6 +566,7 @@ export async function createVTTSource(trackSource: SubtitleSource, proxyResolver
 
 		let vttData = rawData;
 		if (type === "srt") vttData = convertSRTtoVTT(rawData);
+		else vttData = normalizeVTTContent(rawData);
 
 		const fileName = `${trackSource.id || trackSource.langISO || "subtitle"}.vtt`;
 		return await createVTTFile(vttData, fileName, trackSource.playerId, trackSource.playerId);
@@ -562,6 +574,13 @@ export async function createVTTSource(trackSource: SubtitleSource, proxyResolver
 		CNPLogger.error(`Failed to create VTT source for ${trackSource.source}: ${error instanceof Error ? error.message : String(error)}`);
 		throw error;
 	}
+}
+
+/**
+ * Normalize already-WebVTT content before writing it to a local file/blob.
+ */
+export function normalizeVTTContent(vttData: string): string {
+	return vttData.replace(/^\uFEFF/, "");
 }
 
 /**

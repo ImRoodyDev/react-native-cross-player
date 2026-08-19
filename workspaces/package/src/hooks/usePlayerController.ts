@@ -2,16 +2,20 @@ import {
 	OnBufferData,
 	OnLoadData,
 	OnPlaybackStateChangedData,
+	OnProgressData,
+	OnTextTracksData,
 	OnVideoErrorData,
 	ReactVideoProps,
 	SelectedTrackType,
 	SelectedVideoTrackType,
+	TextTracks,
+	TextTrackType,
 	VideoRef
 } from "react-native-video";
 import { Platform, View } from "react-native";
 import React, { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SubtitleSource, VideoSource, VideoSourceWithoutId } from "../types/media";
-import { HlsProxyConfig, ProxyURLResolverCallback } from "../types/hls";
+import { HlsProxyConfig, ProxyConfig } from "../types/hls";
 import { CNPLogger } from "../utils/logger";
 
 // source creation and blob cleanup moved to useSources
@@ -22,8 +26,11 @@ import { PlayerControlsRef } from "../ui/PlayerControls";
 import { useFullscreen } from "./useFullscreen";
 import { t } from "../libs/localization";
 import { isCustomPlayerError } from "../libs/error";
-import { AudioTrack, PlayerControllerState, PlayerState, QualityLevel } from "../types/player";
+import { AudioTrack, PlayerControllerState, PlayerError, PlayerErrorPhase, PlayerState, QualityLevel } from "../types/player";
+
+export type { PlayerError, PlayerErrorPhase } from "../types/player";
 import { isValidTime } from "../utils/helpers";
+import { isRemoteWebURL } from "../utils/detectors";
 
 export type PlayerControllerProps = {
 	/**
@@ -86,14 +93,11 @@ export type PlayerControllerProps = {
 
 	// Settings
 	/**
-	 * Optional proxy tunnel URL used when constructing proxied playlist requests.
+	 * Proxy settings applied to every proxied source, bundled into one object: the proxy
+	 * `url`, the `resolver` that builds proxied URLs, and optional auth (`headers`/`query`)
+	 * sent to the proxy. A source's own `SourceRequestOptions` still override per source.
 	 */
-	proxyURL?: string;
-
-	/**
-	 * Optional resolver callback to produce proxy URLs for remote sources.
-	 */
-	proxyResolver?: ProxyURLResolverCallback;
+	proxyConfig?: ProxyConfig;
 
 	// Player options
 	/**
@@ -117,10 +121,35 @@ export type PlayerControllerProps = {
 	onLazyLoadSource?: (source: VideoSource) => Promise<VideoSourceWithoutId | void>;
 
 	/**
+	 * Called whenever a source fails, at any stage — while preparing, while switching, or
+	 * during playback. The player still shows its own error state; this only reports it.
+	 *
+	 * A host holding alternative links for the same media can switch on `fatal` instead of
+	 * waiting for a "still no playback" timeout to expire.
+	 */
+	onPlaybackError?: (error: PlayerError) => void;
+
+	/**
 	 * Preserve current playback time when switching sources (default true).
 	 */
 	preservePlaybackOnSourceChange?: boolean;
 };
+
+/** Playback rates are fixed; hoisted so `playbackResources` never hands the UI a new array. */
+const PLAYBACK_RATES = [0.5, 1.0, 1.5, 2.0];
+
+/**
+ * Keeps a list referentially stable while its *content* is unchanged.
+ *
+ * Consumers routinely pass inline arrays (`playerConfig={{ videoSources: [...] }}`), whose identity
+ * changes on every host render. Without this, every render of the host page rebuilt playerState /
+ * playbackResources / controls and re-rendered the entire control tree.
+ */
+function useStableList<T>(list: T[]): T[] {
+	const signature = useMemo(() => JSON.stringify(list), [list]);
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	return useMemo(() => list, [signature]);
+}
 
 export function usePlayerController(props: PlayerControllerProps): PlayerControllerState {
 	const {
@@ -136,21 +165,30 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 		initialVideoSource = -1,
 		initialSubtitleSource = -1,
 		initialAudioTrack = -1,
-		subtitleSources = [],
-		videoSources = [],
+		subtitleSources: subtitleSourcesProp = [],
+		videoSources: videoSourcesProp = [],
 		videoRef,
 
 		// Proxy Settings
-		proxyURL,
-		proxyResolver,
+		proxyConfig,
 
 		// Player options
 		autoStart = false,
 		startPosition = 0,
 		lazyLoadSources = true,
 		preservePlaybackOnSourceChange = true,
-		onLazyLoadSource
+		onLazyLoadSource,
+		onPlaybackError
 	} = props;
+
+	// The HLS hook only needs the resolver; the rest of proxyConfig flows to useSources,
+	// which merges it into each source's options (so web + native both pick it up).
+	const proxyResolver = proxyConfig?.resolver;
+
+	// Identity-stable views of the source lists — everything below (effects, memos, controls) keys
+	// off these, so an inline array from the host can no longer churn the whole player.
+	const videoSources = useStableList(videoSourcesProp);
+	const subtitleSources = useStableList(subtitleSourcesProp);
 
 	// States and refs
 	const isMountedRef = useRef(true); // Track if component is mounted
@@ -162,6 +200,11 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 	const pendingSeekSourceRef = useRef<"source-change" | "user">("source-change");
 	const sourceSwitchInFlightRef = useRef<boolean>(false);
 	const blockPositionUpdatesRef = useRef<boolean>(false);
+	// Native only: time to resume to after a subtitle switch re-prepares the player (media3 lazy-
+	// loads a track and restarts from 0). Re-seeked on every onLoad until playback reaches it, then
+	// cleared in onProgress. A safety timer clears it if no re-prepare happens.
+	const nativeSubtitleResumeRef = useRef<number | undefined>(undefined);
+	const nativeSubtitleResumeTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 	const [paused, setPaused] = useState<boolean>(!autoStart);
 	const [rate, setRate] = useState<number>(1.0);
 	const [volume, setVolumeState] = useState<number>(1.0);
@@ -174,8 +217,50 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 	const [isLive, setIsLive] = useState<boolean>(false); // Whether the current media is live
 	const [nativeVideoProps, setNativeVideoProps] = useState<ReactVideoProps>();
 
+	// Error reporting reads through refs on purpose: the emitters below are dependency-free
+	// callbacks (see onError), and pulling the host handler into their deps would churn the
+	// props handed to <Video> on every host re-render.
+	const onPlaybackErrorRef = useRef(onPlaybackError);
+	const sourceIdRef = useRef<string | number>(-1);
+	const videoSourcesRef = useRef(videoSources);
+	useEffect(() => {
+		onPlaybackErrorRef.current = onPlaybackError;
+		sourceIdRef.current = sourceId;
+		videoSourcesRef.current = videoSources;
+	});
+
+	/** Reports a source failure to the host. The player's own error UI is unaffected. */
+	const reportPlaybackError = useCallback(
+		(phase: PlayerErrorPhase, message: string, options?: { fatal?: boolean; cause?: unknown; sourceIndex?: number }) => {
+			const handler = onPlaybackErrorRef.current;
+			if (!handler) return;
+
+			const sources = videoSourcesRef.current;
+			const sourceIndex = options?.sourceIndex ?? sources.findIndex((video) => video.id === sourceIdRef.current);
+
+			try {
+				handler({
+					phase,
+					sourceIndex,
+					sourceId: sourceIndex >= 0 ? sources[sourceIndex]?.id : undefined,
+					fatal: options?.fatal ?? true,
+					message,
+					cause: options?.cause
+				});
+			} catch (error) {
+				// A throwing host handler must not take the player down with it.
+				CNPLogger.warn("onError handler threw:", error);
+			}
+		},
+		[]
+	);
+
 	// Fullscreen management hook
 	const { isFullscreen, onFullscreenEnter, onFullscreenExit, requestFullscreen } = useFullscreen({ videoRef, playerViewRef });
+
+	// Content keys so effects don't re-run when consumers pass a new inline array each render.
+	const videoSourcesKey = useMemo(() => videoSources.map((v) => v.id).join("|"), [videoSources]);
+	const subtitleSourcesKey = useMemo(() => subtitleSources.map((s) => s.id).join("|"), [subtitleSources]);
 
 	// Source management hooks
 	const {
@@ -192,10 +277,9 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 		videoSources,
 		subtitleSources,
 		lazyLoadSources,
-		proxyURL,
+		proxyConfig,
 		videoRef,
 		playerId,
-		proxyResolver,
 		onLazyLoadSource
 	});
 
@@ -225,6 +309,24 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 					defaultSubtitle: initialSubtitleSource
 				});
 
+				// Prepare subtitles BEFORE the video source so the first prepare already has the
+				// final textTracks (avoids a second reload). Isolated try/catch: subtitles must
+				// never block playback.
+				if (!initializedSubtitle) {
+					try {
+						await initializeSubtitles();
+
+						// Apply initial subtitle index if valid
+						if (initialSubtitleSource >= 0 && subtitleSources.length > 0) {
+							await setSubtitleSource(initialSubtitleSource);
+						}
+					} catch (error) {
+						CNPLogger.warn("Subtitle initialization failed; continuing without subtitles:", error);
+					}
+				} else {
+					CNPLogger.info("Subtitles already initialized, skipping initialization effect.");
+				}
+
 				if (!initializedVideo) {
 					// Initialize video and subtitle sources
 					controlsRef.current?.setControlState({ type: "loading", message: t("PREPARING") });
@@ -239,17 +341,6 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 					CNPLogger.info("Video already initialized, skipping initialization effect.");
 				}
 
-				if (!initializedSubtitle) {
-					await initializeSubtitles().then(null); // Video should not wait for subtitles to fail
-
-					// Apply initial subtitle index if valid
-					if (initialSubtitleSource >= 0 && subtitleSources.length > 0) {
-						await setSubtitleSource(initialSubtitleSource);
-					}
-				} else {
-					CNPLogger.info("Subtitles already initialized, skipping initialization effect.");
-				}
-
 				// Apply initial audio track index if valid (deferred until tracks are discovered at onLoad)
 				// initialAudioTrack is applied inside onLoadMetadata after tracks are populated
 			} catch (error) {
@@ -257,12 +348,19 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 				// Show error on controls
 				if (isCustomPlayerError(error)) controlsRef.current?.setControlState({ type: "error", message: error.stateMessage() });
 				else controlsRef.current?.setControlState({ type: "error", message: t("PREPARING_ERROR") });
+
+				reportPlaybackError("initialize", error instanceof Error ? error.message : t("PREPARING_ERROR"), {
+					cause: error,
+					// The initial source is the one that failed, even if it never became current.
+					sourceIndex: initialVideoSource
+				});
 			}
 		})();
 
-		// Run only on mount/unmount or playerId change
+		// Re-run only when the player or the actual source sets change (content keys, not
+		// array identity — see videoSourcesKey above).
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [playerId, videoSources, subtitleSources]);
+	}, [playerId, videoSourcesKey, subtitleSourcesKey]);
 
 	// initialVideoSource and initialSubtitleSource are applied in the init effect above because
 	// those lists come from props and are available immediately at mount time.
@@ -351,6 +449,10 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 				type: "error",
 				message: [data.error.code?.toString() || "400", t("ERROR")]
 			});
+
+			reportPlaybackError("playback", data.error.errorString || data.error.localizedDescription || `Native video error ${data.error.code ?? "400"}`, {
+				cause: data
+			});
 		} else if ("type" in data) {
 			CNPLogger.warn("HLS.js Error:", data);
 			let stateMessage;
@@ -374,6 +476,13 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 					type: "error",
 					message: stateMessage
 				});
+
+			// Non-fatal hls.js errors are recoverable and hls.js retries on its own, so they are
+			// reported but flagged so the host does not switch away from a healthy source.
+			reportPlaybackError("playback", data.details ? `${data.type}: ${data.details}` : stateMessage.join(" "), {
+				fatal: data.fatal,
+				cause: data
+			});
 		}
 
 		// If a source switch is in-flight and errors, keep the last known good
@@ -382,7 +491,7 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 			blockPositionUpdatesRef.current = true;
 			sourceSwitchInFlightRef.current = false;
 		}
-	}, []);
+	}, [reportPlaybackError]);
 
 	const onBuffer = useCallback(
 		(data: OnBufferData) => {
@@ -504,6 +613,12 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 			// Clear loading state defensively after load if idle
 			controlsRef.current?.setControlState({ type: "idle", message: "" });
 
+			// A subtitle switch made media3 re-prepare (restart from 0): seek back to the captured time.
+			// Stays armed (cleared in onProgress once reached) so repeated re-prepares all restore.
+			if (nativeSubtitleResumeRef.current !== undefined && !sourceSwitchInFlightRef.current) {
+				videoRef.current?.seek(nativeSubtitleResumeRef.current);
+			}
+
 			// Seek to preserved time after media metadata is ready.
 			applyPendingSeek();
 
@@ -517,9 +632,9 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 	const onPlaybackStateChanged = useCallback(
 		(data: OnPlaybackStateChangedData) => {
 			CNPLogger.info("Playback state changed:", data);
-			setPaused(!data.isPlaying);
-			// Clear any control states when playback resumes
-			// There is an wierd issue where it shows that video is playing but its not
+			// Do NOT write data.isPlaying into `paused` (it drives <Video paused>): that loops JS and
+			// native chasing each other (flicker + "Maximum update depth"). `paused` is JS-owned.
+			// Just clear the loading state once playback actually starts.
 			if (data.isPlaying && videoSources.length > 0 && controlsRef.current?.state.type !== "idle")
 				controlsRef.current?.setControlState({ type: "idle", message: "" });
 		},
@@ -559,6 +674,7 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 		runDestroy: destroyHls
 	} = useHlsProxy({
 		hlsConfig,
+		proxyResolver,
 		videoRef,
 		onError,
 		onManifestParsed: onLoadMetadata,
@@ -575,6 +691,17 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 		// Video Element cleanup
 		clearPendingSeek();
 		stopLoadSource();
+		// onBuffer only clears this on the buffering->idle edge, so a pending debounce could outlive
+		// the player.
+		if (bufferTimeoutRef.current) {
+			clearTimeout(bufferTimeoutRef.current);
+			bufferTimeoutRef.current = undefined;
+		}
+		nativeSubtitleResumeRef.current = undefined;
+		if (nativeSubtitleResumeTimerRef.current) {
+			clearTimeout(nativeSubtitleResumeTimerRef.current);
+			nativeSubtitleResumeTimerRef.current = undefined;
+		}
 		setSourceId(-1);
 		setSubtitleId(-1);
 		setLevelId(-1);
@@ -607,37 +734,59 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 	 * ******************
 	 */
 
-	// Sync native video props whenever source, subtitle, or audio track selection changes
+	// All side-loaded subtitles, declared up front. Native web: none (web uses <track> elements).
+	// ExoPlayer only reads textTracks when it prepares the source, so they must all be present then.
+	// Track title = subtitle id (unique; the built-in UI never shows the native title).
+	const getNativeTextTracks = useCallback((): TextTracks => {
+		if (Platform.OS === "web") return [];
+		return subtitleSources
+			.map((s) => createdSubtitlesRef.current.get(s.id) ?? s)
+			.filter((s) => !!getNativeSubtitleURI(s))
+			.map((s) => ({ title: s.id, language: s.langISO, type: getNativeSubtitleType(s), uri: getNativeSubtitleURI(s) })) as TextTracks;
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [subtitleSourcesKey]);
+
+	// SOURCE — rebuilt only on a real source (or subtitle-list) change. Kept separate from track
+	// selection so changing subtitle/audio never rebuilds `source`, which would re-prepare the
+	// player and restart from 0 / black-screen.
 	useEffect(() => {
 		const videoSource = createdSourcesRef.current.get(sourceId as string);
-		const subtitleSource = createdSubtitlesRef.current.get(subtitleId as string);
+		// Never hand RNV an empty source: it loads nothing, and textTracks on an empty source crash media3.
+		if (!hlsCreated && !videoSource?.source) return;
+
+		const textTracks = getNativeTextTracks();
 		setNativeVideoProps((prev) => ({
 			...prev,
-			...(hlsCreated
-				? {
-						source: {
-							...prev?.source,
-							uri: undefined, // Clear the native source URI to avoid overwriting HLS Blob
-							headers: {}
-						}
-					}
+			source: hlsCreated
+				? { ...prev?.source, uri: undefined, headers: {}, ...(textTracks.length > 0 && { textTracks }) }
 				: {
-						source: {
-							...prev?.source,
-							uri: videoSource?.source,
-							headers: (videoSource?.options?.nativeSendHeadersOnSourceRequest && videoSource?.options?.headers) || {}
-						}
-					}), // Clear source props if HLS handles it
-			selectedTextTrack: subtitleSource
-				? {
-						type: SelectedTrackType.INDEX,
-						value: Array.from(createdSubtitlesRef.current.keys()).indexOf(subtitleSource.id)
+						...prev?.source,
+						uri: videoSource?.source,
+						headers: (videoSource?.options?.nativeSendHeadersOnSourceRequest && videoSource?.options?.headers) || {},
+						...(textTracks.length > 0 && videoSource?.source ? { textTracks } : {})
 					}
-				: { type: SelectedTrackType.DISABLED },
-			// Native audio track — only applied when HLS is not handling it
+		}));
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [hlsCreated, sourceId, subtitleSourcesKey]);
+
+	// SUBTITLE selection — flips selectedTextTrack only, keeping the source ref (no reload). Title-
+	// based because index selection is unreliable on Android (react-native-video#2349).
+	useEffect(() => {
+		const exists = getNativeTextTracks().some((track) => track.title === subtitleId);
+		setNativeVideoProps((prev) => ({
+			...prev,
+			selectedTextTrack: exists ? { type: SelectedTrackType.TITLE, value: subtitleId as string } : { type: SelectedTrackType.DISABLED }
+		}));
+	}, [subtitleId, getNativeTextTracks]);
+
+	// AUDIO selection — flips selectedAudioTrack only, keeping the source ref (no reload). Skipped
+	// when HLS drives audio.
+	useEffect(() => {
+		setNativeVideoProps((prev) => ({
+			...prev,
 			selectedAudioTrack: !hlsCreated && audioId >= 0 ? { type: SelectedTrackType.INDEX, value: audioId } : undefined
 		}));
-	}, [hlsCreated, sourceId, subtitleId, audioId]);
+	}, [audioId, hlsCreated]);
 
 	const setVideoSource = useCallback(
 		async (sourceIndex: number) => {
@@ -666,9 +815,8 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 				pendingSeekAttemptsRef.current = 0;
 				clearPendingSeekRetry();
 
-				// Lock playback position updates while we attempt to switch sources.
-				// If the attempted source is invalid and emits progress=0, we don't want
-				// to overwrite the preserved time.
+				// Block position updates during the switch so a failed source's progress=0 can't
+				// overwrite the preserved time.
 				blockPositionUpdatesRef.current = true;
 				sourceSwitchInFlightRef.current = true;
 				startedSwitch = true;
@@ -689,14 +837,9 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 						CNPLogger.info("Destroyed existing HLS instance to set new source on native player.");
 					}
 
-					if (!videoRef.current) return CNPLogger.warn("Video reference is not available.");
-
-					// Set source on native video player
-					videoRef.current.setSource({
-						uri: createdSource.source,
-						headers: (video.options?.nativeSendHeadersOnSourceRequest && video.options?.headers) || {},
-						startPosition: startTime
-					});
+					// Source is applied declaratively by the sync effect when `sourceId` changes below
+					// (single owner of the `source` prop). Setting it imperatively too made the player
+					// prepare twice. Start time is applied by the pendingSeek mechanism after load.
 				}
 
 				// Start playback if not lazy loading
@@ -715,6 +858,13 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 				// Show error on controls
 				if (isCustomPlayerError(error)) controlsRef.current?.setControlState({ type: "error", message: error.stateMessage() });
 				else controlsRef.current?.setControlState({ type: "error", message: t("CHANGING_SOURCE_ERROR") });
+
+				// This source never played, so the host can move on immediately — the index is
+				// the requested one, which `sourceId` has not been updated to yet.
+				reportPlaybackError("source-change", error instanceof Error ? error.message : t("CHANGING_SOURCE_ERROR"), {
+					cause: error,
+					sourceIndex
+				});
 			}
 		},
 		[
@@ -726,6 +876,7 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 			hlsSetSource,
 			destroyHls,
 			createHLS,
+			reportPlaybackError,
 			preservePlaybackOnSourceChange,
 			startPosition,
 			clearPendingSeek,
@@ -755,6 +906,16 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 					for (let i = 0; i < tracks.length; i++) {
 						tracks[i].mode = tracks[i].id === subtitle.id ? "showing" : "disabled";
 					}
+				}
+
+				// Native: capture the current time. If this switch makes media3 re-prepare (restart from
+				// 0), onLoad seeks back to it. Safety timer clears it if no re-prepare happens.
+				if (Platform.OS !== "web" && isValidTime(lastPositionRef.current) && lastPositionRef.current > 0.5) {
+					nativeSubtitleResumeRef.current = lastPositionRef.current;
+					if (nativeSubtitleResumeTimerRef.current) clearTimeout(nativeSubtitleResumeTimerRef.current);
+					nativeSubtitleResumeTimerRef.current = setTimeout(() => {
+						nativeSubtitleResumeRef.current = undefined;
+					}, 8000);
 				}
 
 				// Set subtitle on native video player
@@ -901,38 +1062,94 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 		[paused, rate, levelId, sourceId, subtitleId, isFullscreen, volume, audioId, levels, videoSources, subtitleSources, audioTracks, isLive]
 	);
 
-	return {
-		playerState,
-		nativeVideoProps: {
+	// Logs the tracks the native player actually discovered — first thing to check when a subtitle
+	// doesn't render (missing = wiring failed; present but not selected = selection failed).
+	const onTextTracks = useCallback((e: OnTextTracksData) => {
+		CNPLogger.info(
+			"Native text tracks discovered:",
+			e.textTracks.map((track) => ({
+				index: track.index,
+				title: track.title,
+				language: track.language,
+				type: track.type,
+				selected: track.selected
+			}))
+		);
+	}, []);
+
+	// Progress handler only touches refs/shared values, so its identity can stay stable.
+	const onProgress = useCallback(
+		(e: OnProgressData) => {
+			if (!blockPositionUpdatesRef.current && typeof e.currentTime === "number" && isFinite(e.currentTime)) {
+				lastPositionRef.current = e.currentTime;
+			}
+
+			// Subtitle-switch resume reached → stop re-seeking. Still armed (position not yet reached)
+			// while media3 sits near 0 during a re-prepare; onLoad keeps seeking back.
+			const resume = nativeSubtitleResumeRef.current;
+			if (resume !== undefined && typeof e.currentTime === "number" && e.currentTime >= resume - 1.5) {
+				nativeSubtitleResumeRef.current = undefined;
+				if (nativeSubtitleResumeTimerRef.current) {
+					clearTimeout(nativeSubtitleResumeTimerRef.current);
+					nativeSubtitleResumeTimerRef.current = undefined;
+				}
+			}
+
+			if (pendingSeekRef.current !== undefined && isValidTime(pendingSeekRef.current)) {
+				applyPendingSeek();
+			}
+			controlsRef.current?.onProgress(e);
+		},
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+		[applyPendingSeek]
+	);
+
+	const onPlaybackRateChange = useCallback(({ playbackRate }: { playbackRate: number }) => {
+		setRate(playbackRate);
+	}, []);
+
+	// Memoized so identities stay stable: PlayerControls' memo() depends on resources/controls, and
+	// <Video> re-sends props when nativeVideoProps handlers change identity.
+	const mergedNativeVideoProps: ReactVideoProps = useMemo(
+		() => ({
 			...(nativeVideoProps || {}),
 			onError,
 			onBuffer,
 			onPlaybackStateChanged,
 			onLoad: onLoadMetadata,
-			onProgress: (e) => {
-				if (!blockPositionUpdatesRef.current && typeof e.currentTime === "number" && isFinite(e.currentTime)) {
-					lastPositionRef.current = e.currentTime;
-				}
-
-				if (pendingSeekRef.current !== undefined && isValidTime(pendingSeekRef.current)) {
-					applyPendingSeek();
-				}
-				controlsRef.current?.onProgress(e);
-			},
-			onPlaybackRateChange: ({ playbackRate }) => {
-				setRate(playbackRate);
-			},
+			onTextTracks,
+			onProgress,
+			onPlaybackRateChange,
 			onFullscreenPlayerWillPresent: onFullscreenEnter,
 			onFullscreenPlayerWillDismiss: onFullscreenExit
-		},
-		playbackResources: {
+		}),
+		[
+			nativeVideoProps,
+			onError,
+			onBuffer,
+			onPlaybackStateChanged,
+			onLoadMetadata,
+			onTextTracks,
+			onProgress,
+			onPlaybackRateChange,
+			onFullscreenEnter,
+			onFullscreenExit
+		]
+	);
+
+	const playbackResources = useMemo(
+		() => ({
 			levels,
-			rates: [0.5, 1.0, 1.5, 2.0],
+			rates: PLAYBACK_RATES,
 			sources: videoSources,
 			subtitles: subtitleSources,
 			audioTracks
-		},
-		controls: {
+		}),
+		[levels, videoSources, subtitleSources, audioTracks]
+	);
+
+	const controls = useMemo(
+		() => ({
 			cleanup,
 			setFullscreen,
 			setSource: setVideoSource,
@@ -945,6 +1162,44 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 			setPause,
 			setSubtitleOff,
 			setAudioTrack
-		}
+		}),
+		[
+			cleanup,
+			setFullscreen,
+			setVideoSource,
+			setSubtitleSource,
+			setResolution,
+			setVolume,
+			setMuted,
+			setPlaybackRate,
+			setCurrentTime,
+			setPause,
+			setSubtitleOff,
+			setAudioTrack
+		]
+	);
+
+	return {
+		playerState,
+		nativeVideoProps: mergedNativeVideoProps,
+		playbackResources,
+		controls
 	};
+}
+
+/**
+ * URI handed to react-native-video's `source.textTracks` for a subtitle: the created local
+ * VTT file (converted/normalized) once available, or the raw remote URL for entries that
+ * haven't been created yet (lazy loading). Works on react-native-video ~6.14.x; note that
+ * 6.19.x regressed side-loaded track handling — see the pinned peer dependency.
+ */
+function getNativeSubtitleURI(subtitle: SubtitleSource): string {
+	return subtitle.source;
+}
+
+/** react-native-video track type for a subtitle source (ExoPlayer needs the right MIME). */
+function getNativeSubtitleType(subtitle: SubtitleSource): TextTrackType {
+	// Created local files are always converted to WebVTT; only a raw remote SRT (not yet
+	// created/converted) is handed over unconverted and must be declared as SUBRIP.
+	return subtitle.type === "srt" && isRemoteWebURL(subtitle.source) ? TextTrackType.SUBRIP : TextTrackType.VTT;
 }

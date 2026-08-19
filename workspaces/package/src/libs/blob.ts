@@ -188,9 +188,18 @@ export function revokeAllBlobURLs(): void {
 /*  Ensure that the directory for the given file path exists (creates it if needed). */
 async function ensureDirectoryExists(filePath: string): Promise<void> {
 	const dirPath = filePath.substring(0, filePath.lastIndexOf("/"));
-	const exists = await ReactNativeBlobUtil.fs.exists(dirPath);
-	if (!exists) {
+
+	try {
+		const exists = await ReactNativeBlobUtil.fs.exists(dirPath);
+		if (exists) return;
 		await ReactNativeBlobUtil.fs.mkdir(dirPath);
+	} catch (error) {
+		// Race-safe: subtitles/sources in the same group are created concurrently (Promise.all),
+		// so two calls can both pass the exists() check and then both mkdir() the same folder —
+		// the loser throws "already exists". Swallow that specific case; only rethrow if the
+		// directory genuinely isn't there afterwards.
+		const existsNow = await ReactNativeBlobUtil.fs.exists(dirPath).catch(() => false);
+		if (!existsNow) throw error;
 	}
 }
 

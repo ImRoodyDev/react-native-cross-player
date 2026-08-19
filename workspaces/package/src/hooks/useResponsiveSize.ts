@@ -1,59 +1,64 @@
 // External imports
-import { useEffect, useRef, useState } from "react";
-import { Dimensions, ScaledSize } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { Dimensions, Platform } from "react-native";
+import { vars } from "nativewind";
 
 // Internal imports
-import { sizes, SizeType, SizeValues } from "../constants/sizes";
+import { sizes, SizeType, SizeValues, scaleSizeValues, sizeToCssVars } from "../constants/sizes";
+import { getTvScale } from "../utils/scale";
 
-type ResponsiveValues = SizeValues;
-
-// Function to get the current device type based on screen width
+/**
+ * Breakpoints — kept in sync with the ztor tv app (contexts/ResponsiveContext.getSizeType):
+ *   - width <= 599                      -> mobile
+ *   - width <= 1023 && height <= 479    -> mobile_landscape
+ *   - width <= 899                      -> tablet
+ *   - otherwise                         -> default (large screens / TV)
+ * Order matters: the first match wins.
+ */
 const getSizeType = (width: number, height: number): SizeType => {
-	if (width <= 767 && height >= 480) {
-		return "mobile";
-	} else if (width <= 1023 && width >= 768 && height >= 480) return "tablet";
-	else if (width <= 1023 && height <= 480) return "mobile_landscape";
-
+	if (width <= 599) return "mobile";
+	if (width <= 1023 && height <= 479) return "mobile_landscape";
+	if (width <= 899) return "tablet";
 	return "default";
 };
 
-/** Custom hook to get responsive sizes based on device type */
-export const useResponsiveSize = () => {
-	// Get the window dimensions
-	const dimensionsRef = useRef<ScaledSize>(Dimensions.get("window"));
+// Shared subscription to the active breakpoint's raw (unscaled) tokens.
+const useRawResponsiveValues = (): SizeValues => {
+	const [values, setValues] = useState<SizeValues>(() => {
+		const { width, height } = Dimensions.get("window");
+		return sizes[getSizeType(width, height)];
+	});
 
-	// Keep track of the current size type
-	const [_, setCurrentSizeType] = useState<SizeType>("default");
-
-	// Store responsive values based on device type
-	const [responsiveValues, setResponsiveValues] = useState<ResponsiveValues>(sizes.default);
-
-	// Update responsive values only when size type changes
 	useEffect(() => {
 		const onChange = () => {
-			dimensionsRef.current = Dimensions.get("window");
-			const { width, height } = dimensionsRef.current;
-
-			// Get the current size type based on the window dimensions
-			const newSizeType = getSizeType(width, height);
-			//console.log('Current size type:', newSizeType );
-
-			// Only update if the size type has actually changed
-			// if (newSizeType !== currentSizeType) {
-			setCurrentSizeType(newSizeType);
-			setResponsiveValues(sizes[newSizeType]);
-			// }
+			const { width, height } = Dimensions.get("window");
+			setValues(sizes[getSizeType(width, height)]);
 		};
 
-		// Listen for window dimension changes
-		const dimensionSubsription = Dimensions.addEventListener("change", onChange);
-
-		// Initialize setup
+		const subscription = Dimensions.addEventListener("change", onChange);
 		onChange();
-		return () => {
-			dimensionSubsription?.remove();
-		};
+		return () => subscription?.remove();
 	}, []);
 
-	return responsiveValues as Readonly<ResponsiveValues>;
+	return values;
 };
+
+/**
+ * Active responsive tokens as numbers, TV-scaled (via getTvScale) so inline styles match the
+ * scaled CSS variables. On non-TV platforms the raw tokens are returned unchanged.
+ */
+export const useResponsiveSize = (): Readonly<SizeValues> => {
+	const raw = useRawResponsiveValues();
+	return useMemo(() => (Platform.isTV ? scaleSizeValues(raw, getTvScale()) : raw), [raw]);
+};
+
+/**
+ * The CSS custom properties (nativewind `vars()`) for the active breakpoint, scaled by the TV
+ * pixel-ratio. Apply on the player root so every `var(--...)` in styles.css resolves on native.
+ */
+export const useResponsiveVars = () => {
+	const raw = useRawResponsiveValues();
+	return useMemo(() => vars(sizeToCssVars(raw, Platform.isTV ? getTvScale() : 1)), [raw]);
+};
+
+export default useResponsiveSize;

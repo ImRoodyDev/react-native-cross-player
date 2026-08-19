@@ -1,17 +1,19 @@
 "use client";
 
-import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect } from "react";
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo } from "react";
 import { Platform, StatusBar, StyleProp, View as RNView, ViewStyle } from "react-native";
-import Video, { OnProgressData, ReactVideoProps, VideoRef } from "react-native-video";
-import PlayerControls, { PlayerControlsRef } from "./PlayerControls";
+import Video, { OnProgressData, ReactVideoProps, SubtitleStyle, VideoRef } from "react-native-video";
+import PlayerControls, { ControlsProps, PlayerControlsRef } from "./PlayerControls";
 import { PlayerControllerProps, usePlayerController } from "../hooks/usePlayerController";
 import { Languages, setLanguage } from "../libs/localization";
+import { useResponsiveSize, useResponsiveVars } from "../hooks/useResponsiveSize";
 import { View } from "./styled";
 import { CNPLogger } from "../utils/logger";
 import clsx from "clsx";
 import { State } from "../hooks/useComponentState";
 import { SliderThemeType } from "react-native-awesome-slider";
 import { SubtitleSource, VideoSource } from "../types/media";
+import { PlayerError } from "../types/player";
 
 export type VideoPlayerProps = {
 	videoTitle: string;
@@ -20,6 +22,12 @@ export type VideoPlayerProps = {
 	playerConfig: Omit<PlayerControllerProps, "playerViewRef" | "videoRef" | "controlsRef">;
 	viewStyle?: StyleProp<ViewStyle>;
 	videoStyle?: StyleProp<ViewStyle>;
+	/**
+	 * Native subtitle rendering style (Android/iOS). Merged over a responsive default
+	 * (`fontSize` from the active size tokens, TV-scaled). A zero/undefined font size can
+	 * make native subtitles invisible, hence the explicit default.
+	 */
+	subtitleStyle?: SubtitleStyle;
 	theme?: SliderThemeType;
 	onClosePlayer?: () => void;
 	onNextVideo?: () => void;
@@ -29,7 +37,15 @@ export type VideoPlayerProps = {
 	onPlaybackChange?: (isPlaying: boolean) => void;
 	onProgress?: (currentTime: number) => void;
 	onEnd?: () => void;
-};
+	/**
+	 * Called when a source fails — while preparing, while switching, or during playback.
+	 * The player still renders its own error state; this only reports the failure.
+	 *
+	 * Switch away on `fatal` only: non-fatal hls.js errors are recoverable and retried
+	 * internally. See {@link PlayerError}.
+	 */
+	onError?: (error: PlayerError) => void;
+} & Pick<ControlsProps, "HeaderRightElement" | "visibilityDuration">;
 
 export type VideoPlayerRef = {
 	setState: (state: State) => void;
@@ -50,8 +66,12 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 		playerConfig,
 		viewStyle,
 		videoStyle,
+		subtitleStyle,
 		nextLabel,
 		theme,
+		HeaderRightElement,
+		visibilityDuration,
+
 		// Callbacks
 		onNextVideo,
 		onControlVisibilityChange,
@@ -64,43 +84,89 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 	const videoRef = React.useRef<VideoRef>(null);
 	const controlsRef = React.useRef<PlayerControlsRef>(null);
 	const playerViewRef = React.useRef<RNView>(null);
+
+	// `.video-controls-on` only shifts native <track> cues on web (::-webkit-media-text-track-container).
+	// Off web nothing reads it, so don't hold it in state there: every show/hide would otherwise
+	// re-render <Video> + the whole controls tree.
+	const tracksControlsVisibility = Platform.OS === "web";
 	const [controlsVisible, setControlsVisible] = React.useState(true);
+
+	// Consumer callbacks read through a ref: inline props from the host would otherwise churn the
+	// identity of every handler below and defeat memo(PlayerControls).
+	const callbacksRef = React.useRef({ onControlVisibilityChange, onSourceChange, onSubtitleChange, onPlaybackChange, onProgress, onEnd, onClosePlayer: props.onClosePlayer, onNextVideo, onError: props.onError });
+	useEffect(() => {
+		callbacksRef.current = { onControlVisibilityChange, onSourceChange, onSubtitleChange, onPlaybackChange, onProgress, onEnd, onClosePlayer: props.onClosePlayer, onNextVideo, onError: props.onError };
+	});
+
+	// Identity-stable seam for the controller, which keeps it for the player's lifetime.
+	const handlePlaybackError = useCallback((error: PlayerError) => callbacksRef.current.onError?.(error), []);
+
+	// Injects the responsive CSS variables (scaled by the TV pixel-ratio) onto the player root so
+	// every `var(--...)` in styles.css resolves on native — otherwise the whole control layout
+	// collapses because `.responsive-vars` is never mounted by a host on native.
+	const responsiveVars = useResponsiveVars();
+	const { h4 } = useResponsiveSize();
 
 	// Initialize player controller
 	const { nativeVideoProps, playerState, playbackResources, controls } = usePlayerController({
 		videoRef,
 		controlsRef,
 		playerViewRef,
-		...playerConfig
+		...playerConfig,
+		onPlaybackError: handlePlaybackError
 	});
 
-	const videoProps: ReactVideoProps = {
-		...(nativeVideoProps || {}),
-		onProgress: (event: OnProgressData) => {
+	// Memoized: <Video> re-diffs (and re-sends) its props whenever handler identities change, so
+	// the wrapper object and its callbacks must stay stable across unrelated re-renders.
+	const handleProgress = useCallback(
+		(event: OnProgressData) => {
 			nativeVideoProps?.onProgress?.(event);
-			onProgress?.(event.currentTime);
+			callbacksRef.current.onProgress?.(event.currentTime);
 		},
-		onEnd: () => {
-			nativeVideoProps?.onEnd?.();
-			onEnd?.();
-		}
-	};
+		[nativeVideoProps?.onProgress]
+	);
+	const handleEnd = useCallback(() => {
+		nativeVideoProps?.onEnd?.();
+		callbacksRef.current.onEnd?.();
+	}, [nativeVideoProps?.onEnd]);
+
+	// Stable handlers handed to PlayerControls.
+	const handleControlsVisibility = useCallback(
+		(visible: boolean) => {
+			if (tracksControlsVisibility) setControlsVisible(visible);
+			callbacksRef.current.onControlVisibilityChange?.(visible);
+		},
+		[tracksControlsVisibility]
+	);
+	const handleClosePlayer = useCallback(() => callbacksRef.current.onClosePlayer?.(), []);
+	const handleNextVideo = useCallback(() => callbacksRef.current.onNextVideo?.(), []);
+
+	const videoProps: ReactVideoProps = useMemo(
+		() => ({
+			...(nativeVideoProps || {}),
+			onProgress: handleProgress,
+			onEnd: handleEnd
+		}),
+		[nativeVideoProps, handleProgress, handleEnd]
+	);
+
+	// Stable style/prop objects for the native video view (inline literals churn the prop diff).
+	const videoStyleMerged = useMemo(() => [{ width: "100%", height: "auto", margin: "auto" } as ViewStyle, videoStyle], [videoStyle]);
+	const subtitleStyleMerged = useMemo(() => ({ fontSize: h4, ...subtitleStyle }), [h4, subtitleStyle]);
+	const rootStyle = useMemo(() => [responsiveVars, viewStyle], [responsiveVars, viewStyle]);
 
 	// Callbacks for source and subtitle changes
 	useEffect(() => {
 		const source = playbackResources.sources[playerState.sourceIndex];
-		if (source) onSourceChange?.(playerState.sourceIndex, source);
-	}, [onSourceChange, playbackResources.sources, playerState.sourceIndex]);
+		if (source) callbacksRef.current.onSourceChange?.(playerState.sourceIndex, source);
+	}, [playbackResources.sources, playerState.sourceIndex]);
 	useEffect(() => {
 		const subtitle = playbackResources.subtitles[playerState.subtitleIndex];
-		if (subtitle) onSubtitleChange?.(playerState.subtitleIndex, subtitle);
-	}, [onSubtitleChange, playbackResources.subtitles, playerState.subtitleIndex]);
+		if (subtitle) callbacksRef.current.onSubtitleChange?.(playerState.subtitleIndex, subtitle);
+	}, [playbackResources.subtitles, playerState.subtitleIndex]);
 	useEffect(() => {
-		onControlVisibilityChange?.(controlsVisible);
-	}, [controlsVisible, onControlVisibilityChange]);
-	useEffect(() => {
-		onPlaybackChange?.(!playerState.paused);
-	}, [onPlaybackChange, playerState.paused]);
+		callbacksRef.current.onPlaybackChange?.(!playerState.paused);
+	}, [playerState.paused]);
 
 	useLayoutEffect(() => {
 		if (Platform.OS !== "web") return;
@@ -140,9 +206,9 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 	return (
 		<View
 			id={"video-player"}
-			className={clsx("video-player", controlsVisible && "video-controls-on")}
+			className={clsx("video-player responsive-vars", controlsVisible && "video-controls-on")}
 			ref={playerViewRef}
-			style={viewStyle}
+			style={rootStyle}
 			onPointerMove={handlePointerActivity}
 			onTouchStart={handlePointerActivity}
 		>
@@ -153,8 +219,9 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 				focusable={false}
 				disableDisconnectError={false}
 				preventsDisplaySleepDuringVideoPlayback={false}
-				style={[{ width: "100%", height: "auto", margin: "auto" }, videoStyle]}
 				resizeMode={"contain"}
+				style={videoStyleMerged}
+				subtitleStyle={subtitleStyleMerged}
 				{...videoProps}
 				controls={false}
 				paused={playerState.paused}
@@ -168,9 +235,11 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 				resources={playbackResources}
 				playerState={playerState}
 				nextLabel={nextLabel}
-				onControlsVisibilityChange={setControlsVisible}
-				onClosePlayer={props.onClosePlayer}
-				onNextVideo={onNextVideo}
+				HeaderRightElement={HeaderRightElement}
+				onControlsVisibilityChange={handleControlsVisibility}
+				onClosePlayer={handleClosePlayer}
+				onNextVideo={onNextVideo ? handleNextVideo : undefined}
+				visibilityDuration={visibilityDuration}
 			/>
 		</View>
 	);

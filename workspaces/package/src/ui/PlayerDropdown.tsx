@@ -1,10 +1,11 @@
 import React, { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { Platform } from "react-native";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
-import { FlatList as RNFlatList } from "react-native";
 import { useResponsiveSize } from "../hooks/useResponsiveSize";
 import Button from "./Button";
 import { zinc } from "tailwindcss/colors";
-import { View, Text, AnimatedView, FlatList } from "./styled";
+import { View, Text, AnimatedView, ScrollView } from "./styled";
+import FocusGuide from "./FocusGuide";
 
 type BaseProps<T> = {
 	open?: boolean;
@@ -36,23 +37,28 @@ function PlayerDropdown<T>({ title, open, items, onSelect, getItemText, afterSel
 	const sizes = useResponsiveSize();
 	const maxHeight = sizes.h2 * 5 + sizes.h1;
 
-	const flatListRef = useRef<RNFlatList<T>>(null);
+	const scrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
 	const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const height = useSharedValue(0);
 	const opacity = useSharedValue(0);
 
+	// Read off `rest` up front: `rest` itself is a fresh object every render, so depending on it
+	// made this memo (and the findIndex scan) re-run on every pass.
+	const defaultSelected = (rest as { defaultSelected?: number }).defaultSelected;
+	const defaultValue = (rest as { defaultValue?: T }).defaultValue;
+
 	const resolvedDefaultIndex = useMemo(() => {
-		if ("defaultSelected" in rest && typeof rest.defaultSelected === "number") {
-			return rest.defaultSelected;
+		if (typeof defaultSelected === "number") {
+			return defaultSelected;
 		}
 
-		if ("defaultValue" in rest) {
-			const idx = items.findIndex((i) => Object.is(i, rest.defaultValue));
+		if (defaultValue !== undefined) {
+			const idx = items.findIndex((i) => Object.is(i, defaultValue));
 			return idx >= 0 ? idx : 0;
 		}
 
 		return 0;
-	}, [items, rest]);
+	}, [items, defaultSelected, defaultValue]);
 
 	const [selectedIndex, setSelectedIndex] = useState<number>(resolvedDefaultIndex);
 	const [isDropdownOpen, setDropdownOpen] = useState(open ?? false);
@@ -102,19 +108,18 @@ function PlayerDropdown<T>({ title, open, items, onSelect, getItemText, afterSel
 		});
 		opacity.value = withTiming(1, { duration: 200 });
 
-		// Scroll to selected item after opening
+		// Scroll to selected item after opening. Rows are a fixed height (.player-dropdown-item is
+		// var(--h1-size) tall), so we can center the selection with a plain offset — no virtualization.
 		timeoutRef.current = setTimeout(() => {
 			if (selectedIndex > 0 && selectedIndex < items.length) {
-				flatListRef.current?.scrollToIndex({
-					index: selectedIndex,
-					animated: true,
-					viewPosition: 0.5 // center in view
-				});
+				const rowHeight = sizes.h1;
+				const y = Math.max(0, selectedIndex * rowHeight - maxHeight / 2 + rowHeight / 2);
+				scrollRef.current?.scrollTo({ y, animated: true });
 			}
 		}, 500); // wait for animation to start
 
 		setDropdownOpen(true);
-	}, [isDropdownOpen, selectedIndex, items]);
+	}, [isDropdownOpen, selectedIndex, items, sizes.h1, maxHeight]);
 	const closeDropdown = useCallback(() => {
 		if (height.value > 0 || opacity.value > 0) {
 			height.value = withTiming(0, { duration: 300 });
@@ -138,10 +143,18 @@ function PlayerDropdown<T>({ title, open, items, onSelect, getItemText, afterSel
 	);
 	const renderItem = useCallback(
 		({ item, index }: { item: T; index: number }) => (
-			<AnimatedView className={"player-dropdown-item-ptn"}>
+			<AnimatedView key={index} className={"player-dropdown-item-ptn"}>
 				<Button
 					onPress={() => onItemPress(item, index)}
 					disabled={!isDropdownOpen}
+					// Closed-dropdown items must not be focus candidates: `disabled` alone doesn't strip
+					// Android TV focusability, so on close the focused item would keep focus inside the
+					// collapsed dropdown. Dropping focusable forces the system to relocate focus.
+					focusable={isDropdownOpen}
+					// TV: when the dropdown opens, pull D-pad focus onto the currently selected item
+					// so the user starts navigating from their active choice instead of the focus
+					// staying stuck on the trigger button behind the dropdown.
+					hasTVPreferredFocus={isDropdownOpen && index === (selectedIndex < 0 ? 0 : selectedIndex)}
 					className="player-dropdown-item"
 					textClassName={"player-dropdown-item-text"}
 					text={getItemText(item)}
@@ -182,17 +195,36 @@ function PlayerDropdown<T>({ title, open, items, onSelect, getItemText, afterSel
 				<View className={"player-dropdown-header-line"} />
 			</View>
 
-			<FlatList<T>
-				className={"player-dropdown-scroll"}
-				contentContainerClassName={"player-dropdown-items"}
-				ref={flatListRef}
-				data={items}
-				keyExtractor={(_: T, i: number) => i.toString()}
-				renderItem={renderItem}
-				scrollEnabled={isDropdownOpen}
-				aria-disabled={isDropdownOpen}
-				showsVerticalScrollIndicator={true}
-			/>
+			{/*
+			  Traps MUST be conditional on the dropdown being open: unconditional traps kept holding
+			  focus after close — the focused item collapsed with the dropdown and focus was locked
+			  inside an invisible view, leaving the D-pad completely dead.
+			*/}
+			<FocusGuide
+				autoFocus={isDropdownOpen}
+				trapFocusLeft={isDropdownOpen}
+				trapFocusRight={isDropdownOpen}
+				trapFocusDown={isDropdownOpen}
+				trapFocusUp={isDropdownOpen}
+				className={"player-dropdown-scroll-ptn"}
+			>
+				{/*
+			  Plain ScrollView (not FlatList): this list is small and lives inside the app's page
+			  ScrollView, and a VirtualizedList nested in a same-orientation ScrollView warns and
+			  breaks windowing. nestedScrollEnabled lets the inner list scroll on Android.
+			*/}
+				<ScrollView
+					className={"player-dropdown-scroll"}
+					contentContainerClassName={"player-dropdown-items"}
+					ref={scrollRef}
+					scrollEnabled={isDropdownOpen}
+					nestedScrollEnabled
+					showsVerticalScrollIndicator={true}
+					focusable={isDropdownOpen}
+				>
+					{items.map((item, index) => renderItem({ item, index }))}
+				</ScrollView>
+			</FocusGuide>
 		</AnimatedView>
 	);
 }

@@ -88,11 +88,20 @@ See `src/hooks/usePlayerController.ts` for full typings and runtime options. Key
 - `playerState` now includes an `isLive: boolean` flag that indicates whether the loaded media is a live stream (HLS live playlist or a source with no finite duration).
 - Supports `initialVideoSource`, `initialSubtitleSource`, and `initialAudioTrack` (audio applied after media load).
 - Accepts `maxResolutionHeight` to help filter or prefer quality levels when building level lists.
+- Player-level proxying is one bundled prop, `proxyConfig?: ProxyConfig` — `{ url?, resolver?, headers?, query? }` (this replaces the former separate `proxyURL`/`proxyResolver` props). `url` is the proxy base URL, `resolver` builds the proxied URL, and `headers`/`query` authenticate to the proxy. These apply to every proxied source; a source's own `SourceRequestOptions` override per source.
 
 ## `HlsProxy` and HLS helpers
 
 - `HlsProxy` extends `hls.js` to include runtime proxy manager control.
-- Methods: `setSource(url, options?, startTime?)`, `setProxyTunnelURL`, `setProxyTunnelHeaders`, `runDestroy`, etc.
+- Methods: `setSource(url, options?, startTime?)`, `setProxyURL`, `setProxyURLResolver`,
+  `setOriginHeaders`, `setProxyHeaders`, `setProxyQuery`, `runDestroy`, etc.
+- Three request-shaping channels on `SourceRequestOptions`:
+  - `headers` — the **origin's** headers (Referer/User-Agent); encoded into the proxied URL by the
+    resolver (browsers block setting these as real request headers).
+  - `proxyHeaders` — auth to the **proxy** (token/api-key), sent as real request headers.
+  - `proxyQuery` — auth to the **proxy**, appended as query params to the proxied URL.
+  - `proxyHeaders`/`proxyQuery` are only ever sent when `useProxy` is true, so a proxy token never
+    leaks to a direct origin.
 
 ## `controllers` and helpers
 
@@ -190,8 +199,70 @@ See `src/hooks/usePlayerController.ts` for full typings and runtime options. Key
     <td><code>() =&gt; void</code></td>
     <td>Called when the active media finishes playback.</td>
   </tr>
+  <tr>
+    <td><code>onError?</code></td>
+    <td><code>(error: PlayerError) =&gt; void</code></td>
+    <td>Called when a source fails while preparing, while switching, or during playback. The player still shows its own error state; this only reports it. Act on <code>fatal</code> only.</td>
+  </tr>
 </tbody>
 </table>
+
+### `PlayerError`
+
+Reported through `onError`. Lets a host that holds several alternative links for the same
+media switch away the moment one is rejected, rather than inferring failure from a
+"no playback yet" timeout.
+
+<table>
+<thead>
+  <tr>
+    <th>Field</th>
+    <th>Type</th>
+    <th>Description</th>
+  </tr>
+</thead>
+<tbody>
+  <tr>
+    <td><code>phase</code></td>
+    <td><code>"initialize" | "source-change" | "playback"</code></td>
+    <td>Stage reached when the source failed. The first two mean it never played at all.</td>
+  </tr>
+  <tr>
+    <td><code>sourceIndex</code></td>
+    <td><code>number</code></td>
+    <td>Index into <code>videoSources</code>, or <code>-1</code> when the failure predates source selection.</td>
+  </tr>
+  <tr>
+    <td><code>sourceId?</code></td>
+    <td><code>string | number</code></td>
+    <td>Id of the failing source, when one was selected.</td>
+  </tr>
+  <tr>
+    <td><code>fatal</code></td>
+    <td><code>boolean</code></td>
+    <td><code>true</code> when the source is unusable. Non-fatal hls.js errors are recoverable and retried internally — switching away on those abandons a healthy source.</td>
+  </tr>
+  <tr>
+    <td><code>message</code></td>
+    <td><code>string</code></td>
+    <td>Human-readable summary, localized where the player had a message for it.</td>
+  </tr>
+  <tr>
+    <td><code>cause?</code></td>
+    <td><code>unknown</code></td>
+    <td>Underlying error or native/hls.js event payload, for logging.</td>
+  </tr>
+</tbody>
+</table>
+
+```tsx
+<VideoPlayer
+  onError={(error) => {
+    if (error.fatal) switchToNextSource(error.sourceIndex);
+  }}
+  // ...
+/>
+```
 
 ### `VideoPlayerRef`
 

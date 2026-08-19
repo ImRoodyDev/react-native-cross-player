@@ -27,6 +27,7 @@ export const navigation: NavItem[] = [
 		title: 'Guides',
 		children: [
 			{ title: 'Build Your Own Player', href: '/guides/build-your-own-player' },
+			{ title: 'Performance', href: '/guides/performance' },
 			{ title: 'Media Playground', href: '/components/media-playground' },
 			{ title: 'API Overview', href: '/api' },
 		],

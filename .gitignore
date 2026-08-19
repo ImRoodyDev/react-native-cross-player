@@ -44,3 +44,5 @@ yarn-error.*
 PUBLISHING.md
 *.log
 reviews/
+
+.REVIEW.md

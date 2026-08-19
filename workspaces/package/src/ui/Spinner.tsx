@@ -1,9 +1,8 @@
 // External imports
-import React from 'react';
-import Animated, {Easing, interpolate, useAnimatedProps, useDerivedValue, useSharedValue, withRepeat, withTiming} from 'react-native-reanimated';
-import {Circle, Svg} from 'react-native-svg';
-import {ViewStyle} from 'react-native';
-
+import React from "react";
+import Animated, { Easing, interpolate, useAnimatedProps, useDerivedValue, useSharedValue, withRepeat, withTiming } from "react-native-reanimated";
+import { Circle, Svg } from "react-native-svg";
+import { ViewStyle } from "react-native";
 
 // Create animated component properly - native SVG needs special handling
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -25,12 +24,12 @@ function Spinner(props: SpinnerProps) {
 	const {
 		size = 48,
 		strokeWidth = 3,
-		spinnerColor = 'white',
-		backgroundColor = '#656565',
+		spinnerColor = "white",
+		backgroundColor = "#656565",
 		style,
 		className,
 		minArcLength = 0.1, // 10% minimum
-		maxArcLength = 0.8, // 80% maximum
+		maxArcLength = 0.8 // 80% maximum
 	} = props;
 
 	const rotation = useSharedValue(0);
@@ -40,13 +39,13 @@ function Spinner(props: SpinnerProps) {
 
 	React.useEffect(() => {
 		// Start continuous clockwise rotation
-		rotation.value = withRepeat(withTiming(1, {duration: animationDuration, easing: Easing.linear}), -1, false);
+		rotation.value = withRepeat(withTiming(1, { duration: animationDuration, easing: Easing.linear }), -1, false);
 	}, [rotation]);
 
 	React.useEffect(() => {
 		// Animate the arc progress (0 to 1 and back)
 		arcProgressPhase.value = withRepeat(
-			withTiming(1, {duration: animationDuration, easing: Easing.inOut(Easing.quad)}),
+			withTiming(1, { duration: animationDuration, easing: Easing.inOut(Easing.quad) }),
 			-1,
 			true // yoyo effect
 		);
@@ -66,17 +65,25 @@ function Spinner(props: SpinnerProps) {
 
 		return {
 			strokeDasharray: [currentArcLength, gapLength],
-			strokeDashoffset: offset,
+			strokeDashoffset: offset
 		};
 	});
 
 	return (
-		<Svg width={size} height={size} style={style} className={className}>
-			<Circle cx={size / 2} cy={size / 2} r={radius} stroke={backgroundColor} strokeWidth={strokeWidth} fill="none"/>
-			<AnimatedCircle cx={size / 2} cy={size / 2} r={radius} stroke={spinnerColor} strokeWidth={strokeWidth} fill="none" animatedProps={animatedProps} strokeLinecap="round"/>
+		<Svg width={size + 2} height={size + 2} style={style} className={className}>
+			<Circle cx={size / 2} cy={size / 2} r={radius} stroke={backgroundColor} strokeWidth={strokeWidth} fill="none" />
+			<AnimatedCircle
+				cx={size / 2}
+				cy={size / 2}
+				r={radius}
+				stroke={spinnerColor}
+				strokeWidth={strokeWidth}
+				fill="none"
+				animatedProps={animatedProps}
+				strokeLinecap="round"
+			/>
 		</Svg>
 	);
 }
-
 
 export default Spinner;

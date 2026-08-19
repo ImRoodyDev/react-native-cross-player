@@ -191,12 +191,87 @@ export function CustomPlayer() {
 }
 ```
 
+## TV Support
+
+The player has first-class Android TV / tvOS support (requires `react-native-tvos`):
+
+- **Remote / D-pad handling** is built in via the exported `useTVRemote` hook (a no-op off-TV):
+  - **Controls hidden ("watch mode"):** `Left`/`Right` seek ±10s and briefly reveal the scrubber without grabbing focus (so repeated presses keep seeking); `Up`/`Down`/`OK`/`Menu` reopen the full, focusable controls; `Play/Pause` toggles playback.
+  - **Controls visible ("focus mode"):** `Left`/`Right`/`Up`/`Down` fall through to native D-pad focus navigation between the buttons; the dedicated `Play/Pause` / `FastForward` / `Rewind` keys still work.
+  - When hidden, the controls overlay drops `pointerEvents`, so it never traps TV focus on invisible buttons.
+- **Responsive TV scaling:** the player root injects its size tokens as CSS variables (via NativeWind `vars()`), scaled by a pixel-ratio factor derived from the window width relative to a 1920px reference (clamped 0.4–1.1). Breakpoints: `mobile ≤ 599px`, `mobile_landscape ≤ 1023×479`, `tablet ≤ 899px`, `default` otherwise. Use the exported `useResponsiveSize()` (numeric, TV-scaled tokens) and `useResponsiveVars()` (CSS vars) hooks if you build custom UI on top.
+- **D-pad reachability:** the bottom control cluster is wrapped in the exported `FocusGuide` component (a `TVFocusGuideView` on TV, plain `View` elsewhere) so focus can always travel from top overlays to the play/seek/menu row across the non-focusable gesture area. Reuse `FocusGuide` around your own overlay buttons if they become unreachable.
+
+## Subtitles
+
+- **Web:** subtitle files are fetched, converted to WebVTT if needed (SRT supported), stored as `blob:` URLs and attached to the `<video>` element as `<track>` elements. Attachment is idempotent — re-adding the same subtitle id replaces its track instead of duplicating it.
+- **Native (Android/iOS):** subtitles are fetched, converted to WebVTT if needed and written to a local cache file, which is passed to react-native-video via `source.textTracks`; entries not yet created (lazy loading) are declared by their raw remote URL so they exist at prepare time.
+- **Tracks are declared up front:** all subtitles are included in `source.textTracks` on the first load (even with `lazyLoadSources`) because ExoPlayer only reads them when preparing the source — tracks added later to an unchanged `uri` never arrive. Switching subtitles only changes `selectedTextTrack`, so there is no reload/flicker. Tracks are never attached to an empty source (no `uri`) — doing so crashes media3 with an NPE.
+- **Version note:** the react-native-video peer dependency is bounded to `>=6.0.0 <=6.14.1` — later 6.x releases (observed on 6.19.x) regressed side-loaded text track handling, preventing subtitles from rendering.
+- **Native track selection is title-based:** each side-loaded track's `title` is set to its subtitle id and selection uses `selectedTextTrack: { type: 'title', value: <id> }` — index-based selection doesn't reliably match ExoPlayer's internal track order ([react-native-video#2349](https://github.com/TheWidlarzGroup/react-native-video/issues/2349)).
+- **Subtitle styling:** `VideoPlayer` passes a responsive default `fontSize` via react-native-video's `subtitleStyle` (some Android devices otherwise render subtitles invisibly small). Override it with the `subtitleStyle` prop.
+- **Debugging:** the controller logs the tracks the native player actually discovered (`onTextTracks`) — check that log first when a subtitle doesn't render.
+
+## Performance
+
+The control bar is a large tree — buttons, dropdowns, scrubber, focus guides — and everything under `PlayerControls` is memoised, so it does nothing while you watch. But memoisation compares **prop identity, not value**. A single unstable prop from your page defeats it and re-renders the entire tree, re-resolving the styles of hundreds of views. On a TV box that is the difference between 60fps and a visibly janky control bar.
+
+**Bad — every prop here is a new object/array/element on each render:**
+
+```tsx
+<VideoPlayer
+  videoTitle="Big Buck Bunny"
+  playerConfig={{
+    playerId: 'player',
+    videoSources: [{ id: 'main', playerId: 'player', label: 'Main', source: url, format: 'mp4' }],
+    initialVideoSource: 0,
+  }}
+  theme={{ minimumTrackTintColor: '#38bdf8' }}
+  HeaderRightElement={<MuteButton muted={muted} />}
+/>
+```
+
+This looks harmless, and it is the most common cause of player jank: any state change anywhere in the page rebuilds all of those props, and the control bar re-renders with them.
+
+**Good — stable identities, so the controls re-render only on real changes:**
+
+```tsx
+const THEME = { minimumTrackTintColor: '#38bdf8' }; // hoisted — never changes
+
+function Page() {
+  const videoSources = React.useMemo(
+    () => [{ id: 'main', playerId: 'player', label: 'Main', source: url, format: 'mp4' }],
+    [url],
+  );
+  const playerConfig = React.useMemo(
+    () => ({ playerId: 'player', videoSources, initialVideoSource: 0 }),
+    [videoSources],
+  );
+  const headerRight = React.useMemo(() => <MuteButton muted={muted} />, [muted]);
+
+  return <VideoPlayer playerConfig={playerConfig} theme={THEME} HeaderRightElement={headerRight} />;
+}
+```
+
+What the player stabilises for you, and what it cannot:
+
+| Prop | Stabilised? |
+| --- | --- |
+| `playerConfig.videoSources` / `subtitleSources` | **Yes** — compared by content, so an inline array is tolerated (it still costs a comparison every render; prefer `useMemo`). |
+| `theme` | **No** — an inline object re-renders the whole control bar. Hoist it or `useMemo` it. |
+| `HeaderRightElement` | **No** — inline JSX is a new element every render. `useMemo` it. |
+| `onClosePlayer`, `onNextVideo`, `onProgress`, `onEnd`, `onError`, `onControlVisibilityChange`, … | **Yes** — read through a ref, so they are safe to pass inline. |
+
+> **Rule of thumb:** callbacks are safe to inline. Objects, arrays and JSX elements are not.
+
+**Profiling:** measure on a **release** build via [`@callstack/inspector`](https://github.com/callstackincubator/inspector). React DevTools attaches to dev builds, where every render is far slower than production — dev timings will point you at problems that do not exist in a shipped app. When you open a slow commit in the profiler, a component listed as `props changed: theme` or `props changed: resources` is an unstable prop coming from your page, not from the player.
+
 ## Public exports
 
 The package entry exports more than the ready-made components:
 
 - UI: `VideoPlayer`, `PlayerControls`, `VideoPlayerRef`, `PlayerControlsRef`, `ControlsProps`.
-- Controller hooks: `usePlayerController`, `PlayerControllerProps`, `useWebKeyboard`.
+- Controller hooks: `usePlayerController`, `PlayerControllerProps`, `useWebKeyboard`, `useTVRemote`, `useResponsiveSize`, `useResponsiveVars`.
 - Media helpers: `createM3U8Source`, `createMasterM3U8Raw`, `createVTTSource`, `convertSRTtoVTT`, `createM3U8File`, `createVTTFile`, `clearBlobFiles`, `clearBlobGroup`, `revokeAllBlobURLs`.
 - HLS/proxy helpers: `HlsProxy`, `HlsProxyManager`, `ProxyLoader`, `ProxyPlaylistLoader`, `ProxyFragmentLoader`, `HlsProxyConfig`, `ProxyURLResolverCallback`.
 - Types: `VideoSource`, `SubtitleSource`, `SourceRequestOptions`, `M3U8BlobOptions`, `M3U8PlaylistTrack`, `M38USubtitleTrack`, `M3U8AudioTrack`, `SubtitleBlobOptions`, `SourceTypes`, `SubtitleTypes`, `TextEncoding`, `VideoFormats`.
@@ -315,10 +390,46 @@ import { usePlayerController } from "react-native-cross-player";
     <td>No</td>
     <td>Called when playback reaches the end of the active media.</td>
   </tr>
+  <tr>
+    <td><code>onError</code></td>
+    <td><code>(error: PlayerError) =&gt; void</code></td>
+    <td>—</td>
+    <td>No</td>
+    <td>Called when a source fails while preparing, while switching, or during playback. The player still shows its own error state; this only reports it. Act on <code>fatal</code> only.</td>
+  </tr>
 </tbody>
 </table>
 
 `theme` lets you override the colors used by the built-in seek slider without replacing the controls UI.
+
+### Reacting to source failures
+
+`onError` reports a failure the moment it happens, so a host holding several alternative
+links for the same media can switch immediately instead of waiting for a "no playback yet"
+timeout. `phase` says how far the source got — `initialize` and `source-change` mean it
+never played at all, e.g. a rejected manifest.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `phase` | `"initialize" \| "source-change" \| "playback"` | Stage reached when the source failed. |
+| `sourceIndex` | `number` | Index into `videoSources`, or `-1` before a source was selected. |
+| `sourceId` | `string \| number` | Id of the failing source, when one was selected. |
+| `fatal` | `boolean` | `true` when the source is unusable. |
+| `message` | `string` | Human-readable summary, localized where available. |
+| `cause` | `unknown` | Underlying error or native/hls.js payload, for logging. |
+
+Only switch away when `fatal` is true — non-fatal hls.js errors are recoverable and retried
+internally, so treating them as failures abandons a source that is still fine.
+
+```tsx
+<VideoPlayer
+	onError={(error) => {
+		if (error.fatal) switchToNextSource(error.sourceIndex);
+	}}
+	{...rest}
+/>
+```
+
 
 ```tsx
 import { VideoPlayer } from "react-native-cross-player";
@@ -393,7 +504,14 @@ const playerConfig = {
 	subtitleSources: [],
 	initialVideoSource: -1,
 	autoStart: false,
-	proxyURL: 'https://proxy.example.com'
+	// Player-level proxy settings bundled into one object:
+	proxyConfig: {
+		url: 'https://proxy.example.com', // proxy base URL
+		resolver: (targetURL, proxyURL, originHeaders) =>
+			`${proxyURL}/${encodeURIComponent(btoa(targetURL))}`, // builds the proxied URL
+		headers: { 'X-Proxy-Token': 'my-token' }, // (optional) proxy auth as real headers
+		query: { token: 'my-token' }              // (optional) proxy auth as a query param
+	}
 };
 
 <VideoPlayer playerConfig={playerConfig} />
@@ -454,10 +572,10 @@ Key `playerConfig` fields (examples):
     <td>Seek position (seconds) applied on initial load</td>
   </tr>
   <tr>
-    <td><code>proxyURL</code></td>
-    <td><code>string</code></td>
+    <td><code>proxyConfig</code></td>
+    <td><code>{ url?, resolver?, headers?, query? }</code></td>
     <td>—</td>
-    <td>Proxy tunnel URL used for playlist and fragment requests</td>
+    <td>Player-level proxy settings applied to every proxied source: <code>url</code> (proxy base URL), <code>resolver</code> (builds the proxied URL), and optional proxy auth <code>headers</code>/<code>query</code>. A source's own <code>options</code> override per source.</td>
   </tr>
   <tr>
     <td><code>lazyLoadSources</code></td>

@@ -1,4 +1,4 @@
-import { forwardRef, useState } from "react";
+import { forwardRef, memo, useState } from "react";
 import { StyleSheet } from "react-native";
 import Animated, { runOnJS, SharedValue, useAnimatedReaction } from "react-native-reanimated";
 import { formatTime } from "../utils/helpers";
@@ -8,30 +8,41 @@ import clsx from "clsx";
 interface Props {
 	currentTime: SharedValue<number>;
 	fullTime: SharedValue<number>;
+	/**
+	 * Controls' fade opacity. While faded out the clock is invisible, so it stops crossing to JS —
+	 * the auto-hide means that's most of playback. Omit to always update.
+	 */
+	visibility?: SharedValue<number>;
 	className?: string;
 }
 
-const TimeDisplayer = forwardRef(({ currentTime, fullTime, className }: Props, ref?: any) => {
+const TimeDisplayer = forwardRef(({ currentTime, fullTime, visibility, className }: Props, ref?: any) => {
 	const [currentDuration, setCurrentDuration] = useState(0);
 	const [fullDuration, setFullDuration] = useState(0);
 
+	// Only whole seconds are rendered, and only while the controls are actually on screen. Each
+	// update is a React commit (~17ms — a whole 60fps frame), so gate it on both: the raw float
+	// used to hop to JS ~4x/s, even with the controls faded out.
+	// -1 means "don't update"; going visible again always differs from -1, so it refreshes at once.
 	useAnimatedReaction(
 		() => {
-			return currentTime.value;
+			const shown = visibility ? visibility.value > 0.01 : true;
+			return shown ? Math.floor(currentTime.value) : -1;
 		},
-		(currentValue) => {
+		(seconds, previous) => {
 			"worklet";
-			runOnJS(setCurrentDuration)(currentValue);
+			if (seconds >= 0 && seconds !== previous) runOnJS(setCurrentDuration)(seconds);
 		}
 	);
 
 	useAnimatedReaction(
 		() => {
-			return fullTime.value;
+			const shown = visibility ? visibility.value > 0.01 : true;
+			return shown ? Math.floor(fullTime.value) : -1;
 		},
-		(currentValue) => {
+		(seconds, previous) => {
 			"worklet";
-			runOnJS(setFullDuration)(currentValue);
+			if (seconds >= 0 && seconds !== previous) runOnJS(setFullDuration)(seconds);
 		}
 	);
 
@@ -63,4 +74,6 @@ const styles = StyleSheet.create({
 	}
 });
 
-export default TimeDisplayer;
+// memo: every prop is a stable shared value, so a PlayerControls render shouldn't re-render the
+// clock — its own reaction owns when it updates.
+export default memo(TimeDisplayer);
