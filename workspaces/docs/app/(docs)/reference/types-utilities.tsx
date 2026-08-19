@@ -95,7 +95,7 @@ const PUBLIC_TYPES: PropRow[] = [
 
 const SOURCE_REQUEST_OPTIONS: PropRow[] = [
 	{ name: 'useProxy', type: 'boolean', required: true, description: 'Whether this source or subtitle should be resolved through the proxy resolver.' },
-	{ name: 'overrideProxyURL', type: 'string', description: 'Per-item proxy endpoint. Falls back to playerConfig.proxyURL when omitted.' },
+	{ name: 'overrideProxyURL', type: 'string', description: 'Per-item proxy endpoint. Falls back to playerConfig.proxyConfig.url when omitted.' },
 	{ name: 'headers', type: 'Record<string,string>', description: 'Headers passed to the resolver and used for proxied fetches.' },
 	{ name: 'nativeSendHeadersOnSourceRequest', type: 'boolean', default: 'false', description: 'For native platforms, sends headers directly on the react-native-video source request.' },
 ];

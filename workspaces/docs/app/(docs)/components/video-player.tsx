@@ -100,16 +100,18 @@ const playerConfig = {
 
 const PROXY_EXAMPLE = `const playerConfig = {
   playerId: 'proxy-video-player',
-  proxyURL: 'https://api.example.com/proxy',
-  proxyResolver: (targetURL, proxyURL, headers) => {
-    const url = new URL(proxyURL);
-    url.searchParams.set('target', targetURL);
+  proxyConfig: {
+    url: 'https://api.example.com/proxy',
+    resolver: (targetURL, proxyURL, originHeaders) => {
+      const url = new URL(proxyURL);
+      url.searchParams.set('target', targetURL);
 
-    for (const [key, value] of Object.entries(headers)) {
-      url.searchParams.append(\`header.\${key}\`, value);
-    }
+      for (const [key, value] of Object.entries(originHeaders)) {
+        url.searchParams.append(\`header.\${key}\`, value);
+      }
 
-    return url.toString();
+      return url.toString();
+    },
   },
   videoSources: [
     {
@@ -227,8 +229,7 @@ const CONFIG_PROPS: PropRow[] = [
 	{ name: 'initialVideoSource', type: 'number', default: '-1', description: 'Index to load on mount. Use -1 to mount without auto-selecting a source.' },
 	{ name: 'initialSubtitleSource', type: 'number', default: '-1', description: 'Index to enable on mount. Use -1 to keep captions off.' },
 	{ name: 'initialAudioTrack', type: 'number', default: '-1', description: 'Audio track index applied after tracks are discovered from the media.' },
-	{ name: 'proxyURL', type: 'string', description: 'Default proxy endpoint used when a source has options.useProxy enabled.' },
-	{ name: 'proxyResolver', type: 'ProxyURLResolverCallback', description: 'Builds the final proxied URL from target URL, proxy URL, and headers.' },
+	{ name: 'proxyConfig', type: '{ url?, resolver?, headers?, query? }', description: 'Player-level proxy settings used when a source has options.useProxy: proxy base url, resolver, and optional proxy auth headers/query.' },
 	{ name: 'hlsConfig', type: 'Partial<HlsConfig>', description: 'hls.js options forwarded to the web HLS instance.' },
 	{ name: 'maxResolutionHeight', type: 'number', default: 'Infinity', description: 'Filters quality options above a maximum height.' },
 	{ name: 'autoStart', type: 'boolean', default: 'false', description: 'Starts playback after the initial source loads.' },
@@ -280,7 +281,7 @@ export default function VideoPlayerPage() {
 					content: (
 						<View className="gap-3">
 							<BodyText>
-								Use `playerConfig.proxyURL` as the default tunnel, opt individual sources into proxying with
+								Use `playerConfig.proxyConfig.url` as the default tunnel, opt individual sources into proxying with
 								`options.useProxy`, and use `options.overrideProxyURL` only when a source or subtitle needs its own
 								endpoint.
 							</BodyText>

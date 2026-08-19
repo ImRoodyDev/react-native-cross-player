@@ -504,7 +504,14 @@ const playerConfig = {
 	subtitleSources: [],
 	initialVideoSource: -1,
 	autoStart: false,
-	proxyURL: 'https://proxy.example.com'
+	// Player-level proxy settings bundled into one object:
+	proxyConfig: {
+		url: 'https://proxy.example.com', // proxy base URL
+		resolver: (targetURL, proxyURL, originHeaders) =>
+			`${proxyURL}/${encodeURIComponent(btoa(targetURL))}`, // builds the proxied URL
+		headers: { 'X-Proxy-Token': 'my-token' }, // (optional) proxy auth as real headers
+		query: { token: 'my-token' }              // (optional) proxy auth as a query param
+	}
 };
 
 <VideoPlayer playerConfig={playerConfig} />
@@ -565,10 +572,10 @@ Key `playerConfig` fields (examples):
     <td>Seek position (seconds) applied on initial load</td>
   </tr>
   <tr>
-    <td><code>proxyURL</code></td>
-    <td><code>string</code></td>
+    <td><code>proxyConfig</code></td>
+    <td><code>{ url?, resolver?, headers?, query? }</code></td>
     <td>—</td>
-    <td>Proxy tunnel URL used for playlist and fragment requests</td>
+    <td>Player-level proxy settings applied to every proxied source: <code>url</code> (proxy base URL), <code>resolver</code> (builds the proxied URL), and optional proxy auth <code>headers</code>/<code>query</code>. A source's own <code>options</code> override per source.</td>
   </tr>
   <tr>
     <td><code>lazyLoadSources</code></td>

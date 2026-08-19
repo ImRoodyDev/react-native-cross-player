@@ -15,7 +15,7 @@ import {
 import { Platform, View } from "react-native";
 import React, { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SubtitleSource, VideoSource, VideoSourceWithoutId } from "../types/media";
-import { HlsProxyConfig, ProxyURLResolverCallback } from "../types/hls";
+import { HlsProxyConfig, ProxyConfig } from "../types/hls";
 import { CNPLogger } from "../utils/logger";
 
 // source creation and blob cleanup moved to useSources
@@ -93,14 +93,11 @@ export type PlayerControllerProps = {
 
 	// Settings
 	/**
-	 * Optional proxy tunnel URL used when constructing proxied playlist requests.
+	 * Proxy settings applied to every proxied source, bundled into one object: the proxy
+	 * `url`, the `resolver` that builds proxied URLs, and optional auth (`headers`/`query`)
+	 * sent to the proxy. A source's own `SourceRequestOptions` still override per source.
 	 */
-	proxyURL?: string;
-
-	/**
-	 * Optional resolver callback to produce proxy URLs for remote sources.
-	 */
-	proxyResolver?: ProxyURLResolverCallback;
+	proxyConfig?: ProxyConfig;
 
 	// Player options
 	/**
@@ -173,8 +170,7 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 		videoRef,
 
 		// Proxy Settings
-		proxyURL,
-		proxyResolver,
+		proxyConfig,
 
 		// Player options
 		autoStart = false,
@@ -184,6 +180,10 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 		onLazyLoadSource,
 		onPlaybackError
 	} = props;
+
+	// The HLS hook only needs the resolver; the rest of proxyConfig flows to useSources,
+	// which merges it into each source's options (so web + native both pick it up).
+	const proxyResolver = proxyConfig?.resolver;
 
 	// Identity-stable views of the source lists — everything below (effects, memos, controls) keys
 	// off these, so an inline array from the host can no longer churn the whole player.
@@ -277,10 +277,9 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 		videoSources,
 		subtitleSources,
 		lazyLoadSources,
-		proxyURL,
+		proxyConfig,
 		videoRef,
 		playerId,
-		proxyResolver,
 		onLazyLoadSource
 	});
 

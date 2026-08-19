@@ -1,6 +1,6 @@
 import { Platform } from "react-native";
 import { SubtitleSource, VideoSource, VideoSourceWithoutId } from "../types/media";
-import { ProxyURLResolverCallback } from "../types/hls";
+import { ProxyConfig } from "../types/hls";
 import { createM3U8Source, createVTTSource } from "../libs/media";
 import { clearBlobGroup } from "../libs/blob";
 import React, { useCallback, useRef } from "react";
@@ -11,15 +11,17 @@ export type UseSourcesParams = {
 	videoSources?: VideoSource[];
 	subtitleSources?: SubtitleSource[];
 	lazyLoadSources?: boolean;
-	proxyURL?: string;
+	/** Player-level proxy settings applied to every proxied source (a source's own options win). */
+	proxyConfig?: ProxyConfig;
 	videoRef?: React.RefObject<VideoRef | null>;
 	playerId?: string;
-	proxyResolver?: ProxyURLResolverCallback;
 	onLazyLoadSource?: (source: VideoSource) => Promise<VideoSourceWithoutId | void>;
 };
 
 export function useSources(params: UseSourcesParams) {
-	const { videoSources = [], subtitleSources = [], lazyLoadSources = true, proxyURL, proxyResolver, onLazyLoadSource, videoRef } = params;
+	const { videoSources = [], subtitleSources = [], lazyLoadSources = true, proxyConfig, onLazyLoadSource, videoRef } = params;
+	// Unpack the bundled proxy config into the fields used below.
+	const { url: proxyURL, resolver: proxyResolver, headers: proxyHeaders, query: proxyQuery } = proxyConfig ?? {};
 
 	const [initializedVideo, setInitializedVideo] = React.useState(false);
 	const [initializedSubtitle, setInitializedSubtitle] = React.useState(false);
@@ -36,7 +38,12 @@ export function useSources(params: UseSourcesParams) {
 
 			// If the source was updated by the callback, use the updated source for proxy resolution and blob URL creation
 			// Default ProxyURL override by source options if not already set, allowing per-source proxy URL specification
-			if (updatedVideo.options && !updatedVideo.options.overrideProxyURL) updatedVideo.options.overrideProxyURL = proxyURL;
+			if (updatedVideo.options) {
+				if (!updatedVideo.options.overrideProxyURL) updatedVideo.options.overrideProxyURL = proxyURL;
+				// Player-level proxy auth as defaults; a source's own options win on key conflicts.
+				if (proxyHeaders) updatedVideo.options.proxyHeaders = { ...proxyHeaders, ...updatedVideo.options.proxyHeaders };
+				if (proxyQuery) updatedVideo.options.proxyQuery = { ...proxyQuery, ...updatedVideo.options.proxyQuery };
+			}
 
 			// Create m3u8 source for non-web platforms, otherwise resolve proxy if needed
 			if (updatedVideo.format === "m3u8" && Platform.OS !== "web" && updatedVideo.options?.useProxy) {
@@ -53,7 +60,7 @@ export function useSources(params: UseSourcesParams) {
 
 			createdSourcesRef.current.set(updatedVideo.id, updatedVideo);
 		},
-		[proxyURL, proxyResolver, onLazyLoadSource]
+		[proxyURL, proxyResolver, proxyHeaders, proxyQuery, onLazyLoadSource]
 	);
 
 	const addSubtitleSource = useCallback(
@@ -61,7 +68,10 @@ export function useSources(params: UseSourcesParams) {
 			const subtitleOptions = subtitle.options
 				? {
 						...subtitle.options,
-						overrideProxyURL: subtitle.options.overrideProxyURL || proxyURL
+						overrideProxyURL: subtitle.options.overrideProxyURL || proxyURL,
+						// Player-level proxy auth as defaults; the subtitle's own options win.
+						proxyHeaders: { ...(proxyHeaders || {}), ...(subtitle.options.proxyHeaders || {}) },
+						proxyQuery: { ...(proxyQuery || {}), ...(subtitle.options.proxyQuery || {}) }
 					}
 				: subtitle.options;
 
@@ -103,7 +113,7 @@ export function useSources(params: UseSourcesParams) {
 				);
 			}
 		},
-		[proxyURL, proxyResolver, videoRef]
+		[proxyURL, proxyResolver, proxyHeaders, proxyQuery, videoRef]
 	);
 
 	const initializeVideos = useCallback(async () => {

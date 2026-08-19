@@ -88,6 +88,7 @@ See `src/hooks/usePlayerController.ts` for full typings and runtime options. Key
 - `playerState` now includes an `isLive: boolean` flag that indicates whether the loaded media is a live stream (HLS live playlist or a source with no finite duration).
 - Supports `initialVideoSource`, `initialSubtitleSource`, and `initialAudioTrack` (audio applied after media load).
 - Accepts `maxResolutionHeight` to help filter or prefer quality levels when building level lists.
+- Player-level proxying is one bundled prop, `proxyConfig?: ProxyConfig` — `{ url?, resolver?, headers?, query? }` (this replaces the former separate `proxyURL`/`proxyResolver` props). `url` is the proxy base URL, `resolver` builds the proxied URL, and `headers`/`query` authenticate to the proxy. These apply to every proxied source; a source's own `SourceRequestOptions` override per source.
 
 ## `HlsProxy` and HLS helpers
 

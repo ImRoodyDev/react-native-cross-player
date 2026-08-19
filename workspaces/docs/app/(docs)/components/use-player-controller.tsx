@@ -81,14 +81,16 @@ const PROXY_HOOK_EXAMPLE = `const controller = usePlayerController({
   videoRef,
   controlsRef,
   playerId: 'custom-proxy-player',
-  proxyURL: 'https://api.example.com/media-proxy',
-  proxyResolver: (targetURL, proxyURL, headers) => {
-    const url = new URL(proxyURL);
-    url.searchParams.set('target', targetURL);
-    Object.entries(headers).forEach(([key, value]) => {
-      url.searchParams.append(\`header.\${key}\`, value);
-    });
-    return url.toString();
+  proxyConfig: {
+    url: 'https://api.example.com/media-proxy',
+    resolver: (targetURL, proxyURL, originHeaders) => {
+      const url = new URL(proxyURL);
+      url.searchParams.set('target', targetURL);
+      Object.entries(originHeaders).forEach(([key, value]) => {
+        url.searchParams.append(\`header.\${key}\`, value);
+      });
+      return url.toString();
+    },
   },
   videoSources: [
     {
@@ -147,8 +149,7 @@ const PROPS: PropRow[] = [
 	{ name: 'initialSubtitleSource', type: 'number', default: '-1', description: 'Initial subtitle index. Use -1 to keep subtitles disabled.' },
 	{ name: 'initialAudioTrack', type: 'number', default: '-1', description: 'Audio track index applied after the media exposes audio tracks.' },
 	{ name: 'maxResolutionHeight', type: 'number', default: 'Infinity', description: 'Optional max height used when filtering quality levels.' },
-	{ name: 'proxyURL', type: 'string', description: 'Default proxy tunnel endpoint for sources with options.useProxy.' },
-	{ name: 'proxyResolver', type: 'ProxyURLResolverCallback', description: 'Builds the final proxy URL from target URL, proxy URL, and headers.' },
+	{ name: 'proxyConfig', type: '{ url?, resolver?, headers?, query? }', description: 'Player-level proxy settings for sources with options.useProxy: proxy base url, resolver, and optional proxy auth headers/query.' },
 	{ name: 'hlsConfig', type: 'Partial<HlsConfig>', description: 'hls.js config for web HLS playback.' },
 	{ name: 'autoStart', type: 'boolean', default: 'false', description: 'Starts playback automatically after the active source loads.' },
 	{ name: 'startPosition', type: 'number', default: '0', description: 'Initial playback position in seconds.' },
@@ -211,7 +212,7 @@ export default function UsePlayerControllerPage() {
 					content: (
 						<View className="gap-3">
 							<BodyText>
-								The hook uses the same proxy fields as `VideoPlayer`: `proxyURL` is the default endpoint, `proxyResolver`
+								The hook uses the same proxy prop as `VideoPlayer`: `proxyConfig` bundles the default `url` and `resolver`,
 								shapes the request, and each source opts in with `options.useProxy`.
 							</BodyText>
 							<CodeBlock code={PROXY_HOOK_EXAMPLE} language="tsx" />

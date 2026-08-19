@@ -61,8 +61,7 @@ export function HlsBehindProxy() {
       videoTitle="Protected HLS"
       playerConfig={{
         playerId,
-        proxyURL: 'https://api.example.com/media-proxy',
-        proxyResolver: resolveProxyUrl,
+        proxyConfig: { url: 'https://api.example.com/media-proxy', resolver: resolveProxyUrl },
         videoSources: [
           {
             id: 'hls',
@@ -86,8 +85,7 @@ export function HlsBehindProxy() {
 
 const PER_SOURCE_PROXY = `const playerConfig = {
   playerId: 'multi-proxy-example',
-  proxyURL: 'https://api.example.com/default-proxy',
-  proxyResolver: resolveProxyUrl,
+  proxyConfig: { url: 'https://api.example.com/default-proxy', resolver: resolveProxyUrl },
   videoSources: [
     {
       id: 'default-region',
@@ -116,8 +114,7 @@ const PER_SOURCE_PROXY = `const playerConfig = {
 const LAZY_SIGNED_URLS = `const playerConfig = {
   playerId: 'lazy-signed-example',
   lazyLoadSources: true,
-  proxyURL: 'https://api.example.com/media-proxy',
-  proxyResolver: resolveProxyUrl,
+  proxyConfig: { url: 'https://api.example.com/media-proxy', resolver: resolveProxyUrl },
   onLazyLoadSource: async (source) => {
     const signed = await fetch(\`/api/media/sign?id=\${source.id}\`).then((r) => r.json());
 
@@ -175,7 +172,7 @@ export default function ExamplesPage() {
 					content: (
 						<View className="gap-3">
 							<Text className="text-zinc-400 text-sm leading-6">
-								`proxyURL` is the default endpoint. The resolver decides how the final URL is built for your backend.
+								`proxyConfig.url` is the default endpoint. The resolver decides how the final URL is built for your backend.
 							</Text>
 							<CodeBlock code={HLS_PROXY} language="tsx" />
 						</View>
@@ -186,7 +183,7 @@ export default function ExamplesPage() {
 					content: (
 						<View className="gap-3">
 							<CodeBlock code={PER_SOURCE_PROXY} language="ts" />
-							<Callout type="info">Use `overrideProxyURL` sparingly; most apps should set one `playerConfig.proxyURL`.</Callout>
+							<Callout type="info">Use `overrideProxyURL` sparingly; most apps should set one `playerConfig.proxyConfig.url`.</Callout>
 						</View>
 					),
 				},

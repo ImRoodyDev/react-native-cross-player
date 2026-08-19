@@ -27,8 +27,7 @@ const RESOLVER_EXAMPLE = `const resolveProxyUrl: ProxyURLResolverCallback = (tar
 
 const PLAYER_PROXY_EXAMPLE = `const playerConfig = {
   playerId: 'proxy-reference-player',
-  proxyURL: 'https://api.example.com/proxy',
-  proxyResolver: resolveProxyUrl,
+  proxyConfig: { url: 'https://api.example.com/proxy', resolver: resolveProxyUrl },
   videoSources: [
     {
       id: 'hls',
@@ -87,7 +86,7 @@ const HELPERS: PropRow[] = [
 
 const SOURCE_OPTIONS: PropRow[] = [
 	{ name: 'useProxy', type: 'boolean', required: true, description: 'Enables proxy resolution for a source or subtitle.' },
-	{ name: 'overrideProxyURL', type: 'string', description: 'Proxy endpoint for this item. If omitted, playerConfig.proxyURL is copied in.' },
+	{ name: 'overrideProxyURL', type: 'string', description: 'Proxy endpoint for this item. If omitted, playerConfig.proxyConfig.url is copied in.' },
 	{ name: 'headers', type: 'Record<string,string>', description: "The origin's required headers (Referer/User-Agent). Passed to the resolver and encoded into the proxied URL (browsers block setting these as real request headers)." },
 	{ name: 'proxyHeaders', type: 'Record<string,string>', description: 'Auth to the proxy itself (token/api-key), sent as real request headers on every proxied request. Only when useProxy is true; never sent to a direct origin.' },
 	{ name: 'proxyQuery', type: 'Record<string,string>', description: 'Auth to the proxy itself, appended as query params to every proxied URL. Use where custom headers are awkward (e.g. HLS segment loads).' },
@@ -128,7 +127,7 @@ export default function ProxyHelpersPage() {
 					content: (
 						<View className="gap-3">
 							<BodyText>
-								For normal app usage, set `playerConfig.proxyURL`, pass `proxyResolver`, and mark only the protected
+								For normal app usage, set `playerConfig.proxyConfig` (`url` + `resolver`), and mark only the protected
 								sources with `options.useProxy`.
 							</BodyText>
 							<CodeBlock code={PLAYER_PROXY_EXAMPLE} language="ts" />

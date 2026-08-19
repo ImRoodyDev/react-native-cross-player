@@ -73,8 +73,7 @@ export function ProxiedPlayer() {
       videoTitle="Private HLS"
       playerConfig={{
         playerId,
-        proxyURL: 'https://api.example.com/media-proxy',
-        proxyResolver,
+        proxyConfig: { url: 'https://api.example.com/media-proxy', resolver: proxyResolver },
         videoSources: [
           {
             id: 'private-hls',
@@ -129,7 +128,7 @@ export default function QuickStartPage() {
 					content: (
 						<View className="gap-3">
 							<Text className="text-zinc-400 text-sm leading-6">
-								Set `playerConfig.proxyURL` once, then opt each source or subtitle into proxying with `options.useProxy`.
+								Set `playerConfig.proxyConfig.url` once, then opt each source or subtitle into proxying with `options.useProxy`.
 							</Text>
 							<CodeBlock code={PROXY_PLAYER} language="tsx" />
 							<Callout type="info">Use `options.overrideProxyURL` on a source when one item needs a different proxy endpoint.</Callout>

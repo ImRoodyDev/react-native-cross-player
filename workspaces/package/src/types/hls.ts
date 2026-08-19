@@ -11,6 +11,23 @@ import { FragmentLoaderContext, HlsConfig, Loader, LoaderContext, PlaylistLoader
  *  (Referer/User-Agent/…), to be encoded into the URL by the resolver. */
 export type ProxyURLResolverCallback = (targetURL: string, proxyURL: string, originHeaders: Record<string, string>) => string;
 
+/**
+ * Player-level proxy settings, applied to every proxied source. Bundles what used to be
+ * the separate `proxyURL`/`proxyResolver` props plus optional auth. A source's own
+ * `SourceRequestOptions` still wins per source (its `overrideProxyURL`, `proxyHeaders`,
+ * `proxyQuery` override these defaults).
+ */
+export type ProxyConfig = {
+	/** Proxy base URL. Copied into a source's `overrideProxyURL` when it has none. */
+	url?: string;
+	/** Builds the proxied URL from a target + the origin headers. */
+	resolver?: ProxyURLResolverCallback;
+	/** Auth to the proxy (token/api-key) — sent as real request headers on every proxied request. */
+	headers?: Record<string, string>;
+	/** Auth to the proxy (token/api-key) — appended as query params to every proxied URL. */
+	query?: Record<string, string>;
+};
+
 export interface IHlsProxyManager {
 	isProxyEnabled(): boolean;
 	enableProxyLoader(enabled: boolean): void;
