@@ -455,7 +455,7 @@
 
 	padding-left: var(--side-padding);
 	padding-right: var(--side-padding);
-	padding-top: var(--side-padding);
+	padding-top: var(--span6-size);
 	padding-bottom: var(--h5-size);
 	z-index: 1;
 }

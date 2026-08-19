@@ -377,7 +377,7 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 		() => [animOpacityStyle, { pointerEvents: Platform.OS === "web" || state.type !== "idle" ? ("none" as const) : ("box-none" as const) }],
 		[animOpacityStyle, state.type]
 	);
-	const progressStyle = useMemo(() => [animOpacityStyle, { height: sizes.span6 - 2 }], [animOpacityStyle, sizes.span6]);
+	const progressStyle = useMemo(() => [animOpacityStyle, { height: sizes.h1 }], [animOpacityStyle, sizes.span6]);
 	const sliderStyle = useMemo(() => ({ height: sizes.h1, borderRadius: 999999 }), [sizes.h1]);
 	const sliderContainerStyle = useMemo(() => ({ borderRadius: 999999 }), [sizes.h1]);
 	const sliderTheme = useMemo(
