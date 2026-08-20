@@ -1,6 +1,7 @@
 import React from "react";
-import { Platform, View, ViewProps } from "react-native";
+import { Platform, ViewProps } from "react-native";
 import * as ReactNative from "react-native";
+import { View } from "./styled";
 
 export type FocusGuideProps = ViewProps & {
 	/**
