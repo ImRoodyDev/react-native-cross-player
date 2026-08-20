@@ -40,7 +40,7 @@ function ComponentStatus(props: ComponentStatusProps) {
 						numberOfLines={index == 0 ? 1 : 4}
 						ellipsizeMode={"tail"}
 						selectable={false}
-						className={index == 0 ? "component-status-title-txt" : "component-status-txt"}
+						className={index == 0 && text.length < 5 ? "component-status-title-txt" : "component-status-txt"}
 					>
 						{text}
 					</Text>
