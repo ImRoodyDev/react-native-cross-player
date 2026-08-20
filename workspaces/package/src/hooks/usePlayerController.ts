@@ -455,21 +455,31 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 			});
 		} else if ("type" in data) {
 			CNPLogger.warn("HLS.js Error:", data);
-			let stateMessage;
+
+			// HTTP status behind the failure (e.g. 403/404). hls.js exposes it on `response.code`
+			// for load errors; fall back to the raw XHR status on `networkDetails`.
+			const statusCode =
+				(data as { response?: { code?: number } }).response?.code ?? (data as { networkDetails?: { status?: number } }).networkDetails?.status ?? undefined;
+
+			let stateLabel: string;
 			switch (data.type) {
 				case Hls.ErrorTypes.NETWORK_ERROR:
-					stateMessage = [t("NETWORK_ERROR")];
+					stateLabel = t("NETWORK_ERROR");
 					break;
 				case Hls.ErrorTypes.MEDIA_ERROR:
-					stateMessage = [t("DECODE_ERROR")];
+					stateLabel = t("DECODE_ERROR");
 					break;
 				case Hls.ErrorTypes.MUX_ERROR:
-					stateMessage = [t("DECODE_ERROR")];
+					stateLabel = t("DECODE_ERROR");
 					break;
 				default:
-					stateMessage = [t("ERROR")];
+					stateLabel = t("ERROR");
 					break;
 			}
+
+			// Show the status code as the title line (matches the native branch's [code, text] shape),
+			// falling back to a generic "400" when hls.js couldn't surface one (e.g. CORS-blocked).
+			const stateMessage = [statusCode ? String(statusCode) : "400", stateLabel];
 
 			if (data.fatal)
 				controlsRef.current?.setControlState({
@@ -479,7 +489,7 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 
 			// Non-fatal hls.js errors are recoverable and hls.js retries on its own, so they are
 			// reported but flagged so the host does not switch away from a healthy source.
-			reportPlaybackError("playback", data.details ? `${data.type}: ${data.details}` : stateMessage.join(" "), {
+			reportPlaybackError("playback", `${statusCode ? `${statusCode} ` : ""}${data.details ? `${data.type}: ${data.details}` : stateLabel}`, {
 				fatal: data.fatal,
 				cause: data
 			});

@@ -93,9 +93,29 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 
 	// Consumer callbacks read through a ref: inline props from the host would otherwise churn the
 	// identity of every handler below and defeat memo(PlayerControls).
-	const callbacksRef = React.useRef({ onControlVisibilityChange, onSourceChange, onSubtitleChange, onPlaybackChange, onProgress, onEnd, onClosePlayer: props.onClosePlayer, onNextVideo, onError: props.onError });
+	const callbacksRef = React.useRef({
+		onControlVisibilityChange,
+		onSourceChange,
+		onSubtitleChange,
+		onPlaybackChange,
+		onProgress,
+		onEnd,
+		onClosePlayer: props.onClosePlayer,
+		onNextVideo,
+		onError: props.onError
+	});
 	useEffect(() => {
-		callbacksRef.current = { onControlVisibilityChange, onSourceChange, onSubtitleChange, onPlaybackChange, onProgress, onEnd, onClosePlayer: props.onClosePlayer, onNextVideo, onError: props.onError };
+		callbacksRef.current = {
+			onControlVisibilityChange,
+			onSourceChange,
+			onSubtitleChange,
+			onPlaybackChange,
+			onProgress,
+			onEnd,
+			onClosePlayer: props.onClosePlayer,
+			onNextVideo,
+			onError: props.onError
+		};
 	});
 
 	// Identity-stable seam for the controller, which keeps it for the player's lifetime.
@@ -105,7 +125,7 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 	// every `var(--...)` in styles.css resolves on native — otherwise the whole control layout
 	// collapses because `.responsive-vars` is never mounted by a host on native.
 	const responsiveVars = useResponsiveVars();
-	const { h4 } = useResponsiveSize();
+	const { h2 } = useResponsiveSize();
 
 	// Initialize player controller
 	const { nativeVideoProps, playerState, playbackResources, controls } = usePlayerController({
@@ -152,7 +172,7 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 
 	// Stable style/prop objects for the native video view (inline literals churn the prop diff).
 	const videoStyleMerged = useMemo(() => [{ width: "100%", height: "auto", margin: "auto" } as ViewStyle, videoStyle], [videoStyle]);
-	const subtitleStyleMerged = useMemo(() => ({ fontSize: h4, ...subtitleStyle }), [h4, subtitleStyle]);
+	const subtitleStyleMerged = useMemo(() => ({ fontSize: h2, ...subtitleStyle }), [h2, subtitleStyle]);
 	const rootStyle = useMemo(() => [responsiveVars, viewStyle], [responsiveVars, viewStyle]);
 
 	// Callbacks for source and subtitle changes
