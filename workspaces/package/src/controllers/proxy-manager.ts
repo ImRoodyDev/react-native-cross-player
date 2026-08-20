@@ -23,6 +23,9 @@ export class HlsProxyManager implements IHlsProxyManager {
 	private proxyUrl: string | null = null;
 	private resolver: ProxyURLResolverCallback | null = null;
 
+	// One-shot guard so a misconfigured proxy warns once per config, not once per fragment.
+	private warnedMissingProxy = false;
+
 	// The ORIGIN's required headers (Referer/User-Agent/…). Handed to the resolver so it
 	// can encode them into the proxied URL.
 	private originHeaders: Record<string, string> = {};
@@ -37,14 +40,22 @@ export class HlsProxyManager implements IHlsProxyManager {
 
 	enableProxyLoader(enabled: boolean): void {
 		this.useProxy = enabled;
+		this.warnedMissingProxy = false;
 	}
 
 	setProxyURL(url: string): void {
 		this.proxyUrl = url;
+		this.warnedMissingProxy = false;
 	}
 
 	setProxyURLResolver(resolver: ProxyURLResolverCallback): void {
 		this.resolver = resolver;
+		this.warnedMissingProxy = false;
+	}
+
+	/** True only when proxying was requested AND is fully configured (URL + resolver). */
+	private isEffectivelyProxying(): boolean {
+		return this.useProxy && !!this.proxyUrl && !!this.resolver;
 	}
 
 	/** Origin headers the target needs — encoded into the proxied URL by the resolver. */
@@ -67,19 +78,37 @@ export class HlsProxyManager implements IHlsProxyManager {
 	}
 
 	/**
-	 * The auth headers to attach to a proxied request. Empty when proxying is off, so the
-	 * token is never sent to a direct origin. Read live (per request) so a source change
-	 * that passes new `proxyHeaders` takes effect on the next request.
+	 * The real request headers to attach to an hls.js request, read live (per request) so a
+	 * source change takes effect immediately. Three cases:
+	 *
+	 * - Actually proxying → the proxy-auth headers (token/api-key). Origin headers ride in the
+	 *   URL via the resolver, not here.
+	 * - Proxy requested but not configured (direct fallback) → the ORIGIN headers, so the target
+	 *   still receives the source's headers. The proxy-auth token is never sent to a direct
+	 *   origin. (On web the browser drops forbidden names like Referer/User-Agent — unavoidable.)
+	 * - Not proxying at all → nothing, so the token never leaks to a direct origin.
 	 */
 	getProxyHeaders(): Record<string, string> {
-		return this.useProxy ? this.proxyHeaders : {};
+		if (this.isEffectivelyProxying()) return this.proxyHeaders;
+		if (this.useProxy) return this.originHeaders;
+		return {};
 	}
 
 	resolveURL(url: string) {
 		if (!this.useProxy) return url;
 
-		if (!this.proxyUrl) throw new Error("Proxy URL is not set");
-		else if (!this.resolver) throw new Error("Proxy URL resolver is not set");
+		// Proxying was requested but isn't actually configured (no proxy URL and/or no resolver).
+		// Rather than throwing — which hls.js swallows as a non-fatal internalException, silently
+		// breaking the load — fall back to fetching the URL directly.
+		if (!this.proxyUrl || !this.resolver) {
+			if (!this.warnedMissingProxy) {
+				this.warnedMissingProxy = true;
+				CNPLogger.warn(
+					`HlsProxyManager: proxy requested but ${!this.proxyUrl ? "proxy URL" : "resolver"} is not set — loading source directly and sending the source headers instead.`
+				);
+			}
+			return url;
+		}
 
 		try {
 			// originHeaders read live, so a new source's headers apply immediately.
