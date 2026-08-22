@@ -1,6 +1,6 @@
 {
 	"name": "react-native-cross-player",
-	"version": "1.0.0-alpha.13",
+	"version": "1.0.0-alpha.14",
 	"description": "React Native Video Player Wrapper with support for HLS, Subtitles and Proxy across Web, Android, iOS",
 	"scripts": {
 		"clean": "rimraf dist",
@@ -101,6 +101,12 @@
 	},
 	"peerDependenciesMeta": {
 		"react-native-worklets": {
+			"optional": true
+		},
+		"react-native-system-navigation-bar": {
+			"optional": true
+		},
+		"react-native-orientation-locker": {
 			"optional": true
 		}
 	},
