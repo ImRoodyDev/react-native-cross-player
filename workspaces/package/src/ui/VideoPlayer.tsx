@@ -6,7 +6,7 @@ import Video, { OnProgressData, ReactVideoProps, SubtitleStyle, VideoRef } from 
 import PlayerControls, { ControlsProps, PlayerControlsRef } from "./PlayerControls";
 import { PlayerControllerProps, usePlayerController } from "../hooks/usePlayerController";
 import { Languages, setLanguage } from "../libs/localization";
-import { useResponsiveSize, useResponsiveVars } from "../hooks/useResponsiveSize";
+import { useResponsiveSize, useResponsiveSizeType, useResponsiveVars } from "../hooks/useResponsiveSize";
 import { View } from "./styled";
 import { CNPLogger } from "../utils/logger";
 import clsx from "clsx";
@@ -125,7 +125,8 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 	// every `var(--...)` in styles.css resolves on native — otherwise the whole control layout
 	// collapses because `.responsive-vars` is never mounted by a host on native.
 	const responsiveVars = useResponsiveVars();
-	const { h2 } = useResponsiveSize();
+	const screenType = useResponsiveSizeType(); // read to trigger re-render on breakpoint change
+	const { h5, span4, span1 } = useResponsiveSize();
 
 	// Initialize player controller
 	const { nativeVideoProps, playerState, playbackResources, controls } = usePlayerController({
@@ -172,7 +173,14 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 
 	// Stable style/prop objects for the native video view (inline literals churn the prop diff).
 	const videoStyleMerged = useMemo(() => [{ width: "100%", height: "auto", margin: "auto" } as ViewStyle, videoStyle], [videoStyle]);
-	const subtitleStyleMerged = useMemo(() => ({ fontSize: h2, ...subtitleStyle }), [h2, subtitleStyle]);
+	const subtitleStyleMerged = useMemo(() => {
+		if (screenType === "mobile_landscape" || screenType === "mobile") {
+			return { fontSize: span4, ...subtitleStyle };
+		} else if (screenType === "tablet") {
+			return { fontSize: span1, ...subtitleStyle };
+		}
+		return { fontSize: h5, ...subtitleStyle };
+	}, [h5, span4, span1, screenType, subtitleStyle]);
 	const rootStyle = useMemo(() => [responsiveVars, viewStyle], [responsiveVars, viewStyle]);
 
 	// Callbacks for source and subtitle changes

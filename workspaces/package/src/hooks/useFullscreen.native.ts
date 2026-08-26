@@ -1,4 +1,4 @@
-import { StatusBar, Platform } from "react-native";
+import { StatusBar, Platform, Dimensions } from "react-native";
 import { useCallback, useEffect, useState } from "react";
 import SystemNavigationBar from "react-native-system-navigation-bar";
 import Orientation from "react-native-orientation-locker";
@@ -15,30 +15,58 @@ export function useFullscreen(props: UseFullscreenProps): UseFullscreenResult {
 
 	const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
-	// Hide the Android navigation bar for the entire lifetime of the player and
-	// restore it when the player unmounts (is destroyed). This is intentionally
-	// tied to mount/unmount rather than to fullscreen enter/exit, so the bar
-	// stays hidden while the player is on screen — inline or fullscreen alike.
+	// Drive the system bars from device orientation for the whole player lifetime —
+	// rotating a phone into landscape is this player's "fullscreen".
+	//   - portrait (inline): status bar visible (Android: nav bar hidden)
+	//   - landscape (fullscreen): status bar hidden (Android: nav bar hidden too)
+	// `isFullscreen` is kept in sync so <StatusBar hidden={isFullscreen}> in VideoPlayer
+	// follows along — that component hides the status bar on iOS. On Android, edge-to-edge
+	// makes RN's StatusBar unreliable (time/battery stayed visible in landscape), so the
+	// bars are driven imperatively via sticky immersive (WindowInsetsController) instead.
 	useEffect(() => {
-		if (Platform.OS !== "android") return;
-		SystemNavigationBar.navigationHide();
+		if (Platform.OS !== "android" && Platform.OS !== "ios") return;
+
+		const apply = (landscape: boolean) => {
+			setIsFullscreen(landscape);
+			if (Platform.OS === "android") {
+				if (landscape) {
+					// Hide status + navigation bars; a swipe reveals them briefly, then they re-hide.
+					SystemNavigationBar.stickyImmersive(true);
+				} else {
+					// Leave immersive, but keep the nav bar hidden while the player is on screen.
+					SystemNavigationBar.stickyImmersive(false);
+					SystemNavigationBar.navigationHide();
+				}
+			}
+			// iOS: <StatusBar hidden={isFullscreen}> in VideoPlayer follows the state set above.
+		};
+
+		const { width, height } = Dimensions.get("window");
+		apply(width > height);
+		const subscription = Dimensions.addEventListener("change", ({ window }) => apply(window.width > window.height));
+
 		return () => {
-			SystemNavigationBar.navigationShow();
+			subscription?.remove();
+			// Restore normal system bars when the player is destroyed (Android only).
+			if (Platform.OS === "android") {
+				SystemNavigationBar.stickyImmersive(false);
+				SystemNavigationBar.navigationShow();
+			}
 		};
 	}, []);
 
 	const onFullscreenEnter = useCallback(() => {
 		setIsFullscreen(true);
-		StatusBar.setHidden(true);
+		// iOS has no immersive API; hide the status bar directly. On Android the effect
+		// above already owns bar visibility (edge-to-edge makes setHidden unreliable there).
+		if (Platform.OS !== "android") StatusBar.setHidden(true);
 		Orientation.lockToLandscape();
 	}, []);
 
 	const onFullscreenExit = useCallback(() => {
 		setIsFullscreen(false);
-		StatusBar.setHidden(false);
+		if (Platform.OS !== "android") StatusBar.setHidden(false);
 		Orientation.unlockAllOrientations();
-		// Navigation bar is deliberately left hidden here — it is only restored
-		// on unmount (see the effect above), not when leaving fullscreen.
 	}, []);
 
 	const requestFullscreen = useCallback(
