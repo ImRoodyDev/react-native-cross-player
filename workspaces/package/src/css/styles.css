@@ -638,6 +638,10 @@
 		font-size: var(--span3-size);
 	}
 
+	.player-dropdown {
+		width: 24vw;
+		max-height: 80%;
+	}
 	.player-dropdown-header {
 		padding-top: var(--span5-size);
 		padding-bottom: var(--span5-size);
