@@ -1,3 +1,5 @@
+import { Platform } from "react-native";
+
 export type SizeType = keyof typeof sizes;
 export type SizeValues = typeof sizes.default;
 export type SizesKeys = keyof SizeValues;
@@ -9,6 +11,7 @@ export const sizes = {
 		sidePadding: 42,
 		topPadding: 32,
 
+		/* Sizes*/
 		h1: 48,
 		h2: 42,
 		h3: 36,
@@ -21,12 +24,13 @@ export const sizes = {
 		span4: 14,
 		span5: 12,
 		span6: 8,
-		outlineWidth: 2
+		outlineWidth: Platform.OS === "web" ? 2 : 1.4
 	},
 	tablet: {
 		sidePadding: 42,
 		topPadding: 32,
 
+		/* Sizes*/
 		h1: 44,
 		h2: 38,
 		h3: 32,
@@ -45,6 +49,7 @@ export const sizes = {
 		sidePadding: 22,
 		topPadding: 20,
 
+		/* Sizes*/
 		h1: 36,
 		h2: 30,
 		h3: 26,
@@ -63,6 +68,7 @@ export const sizes = {
 		sidePadding: 22,
 		topPadding: 20,
 
+		/* Sizes*/
 		h1: 36,
 		h2: 30,
 		h3: 26,

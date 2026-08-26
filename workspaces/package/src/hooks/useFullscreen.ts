@@ -1,47 +1,14 @@
-import { StatusBar, Platform, View } from "react-native";
-import React, { useCallback, useState } from "react";
-import SystemNavigationBar from "react-native-system-navigation-bar";
-import Orientation from "react-native-orientation-locker";
-
-export function useFullscreen(props: { videoRef?: React.RefObject<any>; playerViewRef?: React.RefObject<View | null> }) {
-	const { videoRef, playerViewRef } = props || {};
-
-	const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
-
-	const onFullscreenEnter = useCallback(() => {
-		setIsFullscreen(true);
-		StatusBar.setHidden(true);
-		Orientation.lockToLandscape();
-		if (Platform.OS === "android") SystemNavigationBar.navigationHide();
-	}, []);
-
-	const onFullscreenExit = useCallback(() => {
-		setIsFullscreen(false);
-		StatusBar.setHidden(false);
-		Orientation.unlockAllOrientations();
-		if (Platform.OS === "android") SystemNavigationBar.navigationShow();
-	}, []);
-
-	const requestFullscreen = useCallback(
-		(enable: boolean) => {
-			if (enable) {
-				if (Platform.OS === "web") {
-					const screen = /^((?!chrome|android).)*safari/i.test(navigator.userAgent)
-						? videoRef?.current?.nativeHtmlVideoRef?.current
-						: playerViewRef?.current;
-					if (!screen) return;
-					// use browser fullscreen API
-					(screen as any).requestFullscreen?.();
-				} else videoRef?.current?.presentFullscreenPlayer?.();
-				onFullscreenEnter();
-			} else {
-				if (Platform.OS === "web") (document as any).exitFullscreen?.();
-				else videoRef?.current?.dismissFullscreenPlayer?.();
-				onFullscreenExit();
-			}
-		},
-		[videoRef, playerViewRef, onFullscreenEnter, onFullscreenExit]
-	);
-
-	return { isFullscreen, onFullscreenEnter, onFullscreenExit, requestFullscreen };
-}
+// Platform-neutral entry for `useFullscreen`.
+//
+// The real implementations live in the platform-specific siblings:
+//   - useFullscreen.web.ts    -> browser Fullscreen API, zero native imports
+//   - useFullscreen.native.ts -> iOS/Android/tvOS, uses the native modules
+//
+// Metro / Expo web / webpack (react-native-web) resolve `.web` and `.native`
+// suffixes at bundle time, so this file is never bundled when a platform
+// variant matches. It exists so TypeScript (moduleResolution: "bundler", which
+// does not resolve platform suffixes) can resolve `./useFullscreen`, and as the
+// fallback for native bundlers. It re-exports the native variant, so this base
+// must not be reached on web — the `.web` file always wins there.
+export * from "./useFullscreen.native";
+export type { UseFullscreenProps, UseFullscreenResult, UseFullscreen } from "./useFullscreen.types";

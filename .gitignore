@@ -46,3 +46,7 @@ PUBLISHING.md
 reviews/
 
 .REVIEW.md
+.expo/
+expo/
+android/
+ios/
