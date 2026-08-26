@@ -59,6 +59,8 @@ export type VideoPlayerRef = {
 	getCurrentSubtitleIndex: () => number;
 };
 
+const TracksControlsVisibility = Platform.OS === "web";
+
 const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) => {
 	const {
 		videoTitle,
@@ -88,7 +90,6 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 	// `.video-controls-on` only shifts native <track> cues on web (::-webkit-media-text-track-container).
 	// Off web nothing reads it, so don't hold it in state there: every show/hide would otherwise
 	// re-render <Video> + the whole controls tree.
-	const tracksControlsVisibility = Platform.OS === "web";
 	const [controlsVisible, setControlsVisible] = React.useState(true);
 
 	// Consumer callbacks read through a ref: inline props from the host would otherwise churn the
@@ -103,19 +104,6 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 		onClosePlayer: props.onClosePlayer,
 		onNextVideo,
 		onError: props.onError
-	});
-	useEffect(() => {
-		callbacksRef.current = {
-			onControlVisibilityChange,
-			onSourceChange,
-			onSubtitleChange,
-			onPlaybackChange,
-			onProgress,
-			onEnd,
-			onClosePlayer: props.onClosePlayer,
-			onNextVideo,
-			onError: props.onError
-		};
 	});
 
 	// Identity-stable seam for the controller, which keeps it for the player's lifetime.
@@ -152,13 +140,10 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 	}, [nativeVideoProps?.onEnd]);
 
 	// Stable handlers handed to PlayerControls.
-	const handleControlsVisibility = useCallback(
-		(visible: boolean) => {
-			if (tracksControlsVisibility) setControlsVisible(visible);
-			callbacksRef.current.onControlVisibilityChange?.(visible);
-		},
-		[tracksControlsVisibility]
-	);
+	const handleControlsVisibility = useCallback((visible: boolean) => {
+		if (TracksControlsVisibility) setControlsVisible(visible);
+		callbacksRef.current.onControlVisibilityChange?.(visible);
+	}, []);
 	const handleClosePlayer = useCallback(() => callbacksRef.current.onClosePlayer?.(), []);
 	const handleNextVideo = useCallback(() => callbacksRef.current.onNextVideo?.(), []);
 
@@ -184,6 +169,19 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 	const rootStyle = useMemo(() => [responsiveVars, viewStyle], [responsiveVars, viewStyle]);
 
 	// Callbacks for source and subtitle changes
+	useEffect(() => {
+		callbacksRef.current = {
+			onControlVisibilityChange,
+			onSourceChange,
+			onSubtitleChange,
+			onPlaybackChange,
+			onProgress,
+			onEnd,
+			onClosePlayer: props.onClosePlayer,
+			onNextVideo,
+			onError: props.onError
+		};
+	});
 	useEffect(() => {
 		const source = playbackResources.sources[playerState.sourceIndex];
 		if (source) callbacksRef.current.onSourceChange?.(playerState.sourceIndex, source);

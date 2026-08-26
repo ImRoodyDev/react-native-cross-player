@@ -38,7 +38,7 @@ yarn-error.log
 *.png
 .circleci/config.yml
 .eslintcache
-
+*.disabled.ts
 
 # Documentation
 docs/

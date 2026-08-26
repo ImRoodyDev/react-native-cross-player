@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { View, Dimensions } from 'react-native';
 import { CNPLogger, ProxyLogger, VideoPlayer, VideoPlayerRef, VideoSource } from 'react-native-cross-player';
@@ -27,6 +28,7 @@ const initialDummySources: VideoSource[] = [
 
 // Reproduces the ztor movies/play screen that OOM-crashes on device.
 export default function Play() {
+	const router = useRouter();
 	const playerRef = useRef<VideoPlayerRef>(null);
 	const [sourceIndex, setSourceIndex] = useState(0);
 	const [sources] = useState<VideoSource[]>(initialDummySources);
@@ -74,7 +76,9 @@ export default function Play() {
 				}}
 				viewStyle={{ width: '100%', height: '100%' }}
 				videoStyle={{ width: '100%', height: '100%' }}
-				onClosePlayer={() => {}}
+				onClosePlayer={() => {
+					router.navigate('/'); // Replace with the actual route for the next video
+				}}
 				onSourceChange={(index) => setSourceIndex(index)}
 				onNextVideo={() => {}}
 			/>

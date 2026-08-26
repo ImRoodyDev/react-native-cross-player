@@ -7,7 +7,7 @@ import { Easing, useAnimatedStyle, useSharedValue, withTiming, ZoomIn } from "re
 import useWebKeyboard from "../hooks/useWebKeyboard";
 import useTVRemote from "../hooks/useTVRemote";
 import { useResponsiveSize } from "../hooks/useResponsiveSize";
-import { Platform, StyleSheet, View as RNView } from "react-native";
+import { Platform, StyleSheet, View as RNView, BackHandler } from "react-native";
 import { View, Text, SafeAreaView, AnimatedView } from "./styled";
 import Button from "./Button";
 import { sky, zinc } from "tailwindcss/colors";
@@ -299,6 +299,16 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 		};
 	}, []); // Run once on mount
 
+	// FIX 4: Handle hardware back button on Android to prevent issue with the SafeAreaView => where you see wierd padding onscreen after pressing backhandler
+	useEffect(() => {
+		const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+			props.onClosePlayer?.();
+			return true;
+		});
+
+		return () => subscription.remove();
+	}, [props.onClosePlayer]);
+
 	useImperativeHandle(
 		ref,
 		() => ({
@@ -319,15 +329,13 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 		[state, showControls]
 	);
 
-	// Map Web keyboard events
+	// Map Web keyboard and remote keys events
 	useWebKeyboard({
 		" ": togglePlay,
 		ArrowRight: seekForward,
 		ArrowLeft: seekBackward,
 		f: toggleFullscreen
 	});
-
-	// Map TV remote / D-pad events (no-op off-TV).
 	useTVRemote(
 		{
 			up: showControls,
