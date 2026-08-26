@@ -1,0 +1,7 @@
+/* Player styles pulled straight from the package source (no build/tgz needed). */
+@import '../../../package/src/css/styles.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+@tailwind variants;

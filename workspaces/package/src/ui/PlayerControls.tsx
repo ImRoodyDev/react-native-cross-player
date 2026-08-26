@@ -6,7 +6,6 @@ import { Action, State, useComponentStateReducer } from "../hooks/useComponentSt
 import { Easing, useAnimatedStyle, useSharedValue, withTiming, ZoomIn } from "react-native-reanimated";
 import useWebKeyboard from "../hooks/useWebKeyboard";
 import useTVRemote from "../hooks/useTVRemote";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useResponsiveSize } from "../hooks/useResponsiveSize";
 import { Platform, StyleSheet, View as RNView } from "react-native";
 import { View, Text, SafeAreaView, AnimatedView } from "./styled";
@@ -48,6 +47,9 @@ export type PlayerControlsRef = {
 	state: Readonly<State>;
 };
 
+const CLOSE_BUTTON_STYLE = { outlineColor: "white", outlineStyle: "solid", outlineWidth: 2 } as const;
+const HIDDEN_PROPS = { style: { display: "none" }, focusable: false } as const;
+
 /**
  * Shared styling for every control-bar button (play, seek, mute, menus, close, ...).
  * Keeps the visual identity in ONE place instead of repeating the same 7 props per button;
@@ -72,13 +74,6 @@ const ControlButton = memo(
 );
 ControlButton.displayName = "ControlButton";
 
-// Hoisted: inline literals would give every button a new `style`/prop object each render and
-// defeat memo on the whole button subtree.
-const CLOSE_BUTTON_STYLE = { outlineColor: "white", outlineStyle: "solid", outlineWidth: 2 } as const;
-// focusable:false alongside display:none — a hidden button is otherwise still a 0-size focus
-// candidate on Android TV and derails directional navigation.
-const HIDDEN_PROPS = { style: { display: "none" }, focusable: false } as const;
-
 const getSourceText = (i: VideoSource) => i.label;
 const getSubtitleText = (i: SubtitleSource) => i.label || i.langISO;
 const getLevelText = (i: QualityLevel) => i.name;
@@ -91,7 +86,6 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 
 	// Hooks
 	const sizes = useResponsiveSize();
-	const insets = useSafeAreaInsets();
 	const defaultIconSize = sizes.h5;
 
 	// Timeout reference for control visibility
@@ -109,17 +103,13 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 
 	const controlsVisibleRef = useRef(true);
 	const playButtonRef = useRef<RNView | null>(null);
-	// Node kept in state as well: `nextFocusDown` needs the mounted view, and a ref alone never
-	// re-renders the close button to apply it (it only ever landed by luck on an unrelated render).
-	const [playButtonNode, setPlayButtonNode] = React.useState<RNView | null>(null);
-	const setPlayButton = useCallback((node: RNView | null) => {
-		playButtonRef.current = node;
-		setPlayButtonNode(node);
-	}, []);
 	const seekBackwardGestureRef = useRef<PlayerGestureRef>(null);
 	const seekForwardGestureRef = useRef<PlayerGestureRef>(null);
 	const playGestureRef = useRef<PlayerGestureRef>(null);
 
+	// Node kept in state as well: `nextFocusDown` needs the mounted view, and a ref alone never
+	// re-renders the close button to apply it (it only ever landed by luck on an unrelated render).
+	const [playButtonNode, setPlayButtonNode] = React.useState<RNView | null>(null);
 	// TV: after a dropdown closes, D-pad focus must be handed back to a real control — the item
 	// that held focus collapses with the dropdown and becomes unfocusable, which otherwise leaves
 	// the system with no focused view (dead D-pad). Pulsing hasTVPreferredFocus on the play button
@@ -134,6 +124,16 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 
 		returnFocusTimerRef.current = setTimeout(() => setReturnFocusPulse(false), 50);
 	}, []);
+
+	const setPlayButton = useCallback((node: RNView | null) => {
+		// `nextFocusDown` is a TV-only D-pad concern. Off-TV, writing the mounted node into
+		// state here re-renders the close button (which consumes it via `nextFocusDown`), which
+		// re-mounts the play button, which fires this ref callback again — an infinite re-render
+		// loop that grows the tree until the app is OOM-killed. Only track the node on TV.
+		playButtonRef.current = node;
+		if (Platform.isTV) setPlayButtonNode(node);
+	}, []);
+
 	useEffect(() => {
 		return () => {
 			if (returnFocusTimerRef.current) clearTimeout(returnFocusTimerRef.current);
@@ -362,21 +362,12 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 		opacity: visibilityOpacity.value
 	}));
 
-	// Memoized style arrays/objects: inline literals re-render the (expensive) CssInterop/Animated
-	// wrappers below on every pass.
-	const safeStyle = useMemo(
-		() => ({
-			paddingTop: insets.top,
-			paddingBottom: Math.max(insets.bottom - sizes.sidePadding, 0)
-		}),
-		[insets, sizes.sidePadding]
-	);
-	const rootStyle = useMemo(() => [StyleSheet.absoluteFill, safeStyle], [safeStyle]);
 	const statusHiddenStyle = useMemo(() => (state.type !== "idle" ? ({ pointerEvents: "none", opacity: 0 } as const) : undefined), [state.type]);
 	const menusStyle = useMemo(
 		() => [animOpacityStyle, { pointerEvents: Platform.OS === "web" || state.type !== "idle" ? ("none" as const) : ("box-none" as const) }],
 		[animOpacityStyle, state.type]
 	);
+	const actionsStyle = useMemo(() => [{ pointerEvents: Platform.OS === "web" ? ("none" as const) : ("box-none" as const) }], []);
 	const progressStyle = useMemo(() => [animOpacityStyle, { height: sizes.h1 }], [animOpacityStyle, sizes.span6]);
 	const sliderStyle = useMemo(() => ({ height: sizes.h1, borderRadius: 999999 }), [sizes.h1]);
 	const sliderContainerStyle = useMemo(() => ({ borderRadius: 999999 }), [sizes.h1]);
@@ -391,45 +382,47 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 		[theme]
 	);
 	const bubbleTextStyle = useMemo(() => ({ fontSize: sizes.span2, fontFamily: "Montserrat-Medium", color: "black" }), [sizes.span2]);
-	const closeButtonFocus = useMemo(() => (playButtonNode ? ({ nextFocusDown: playButtonNode } as object) : {}), [playButtonNode]);
+	// TV only: hand the close button an explicit D-pad target. Off-TV this must stay empty —
+	// `nextFocusDown` there feeds the play-button-node re-render loop (see setPlayButton).
+	const closeButtonFocus = useMemo(() => (Platform.isTV && playButtonNode ? ({ nextFocusDown: playButtonNode } as object) : {}), [playButtonNode]);
 
 	return (
-		<SafeAreaView className="player-controls" style={rootStyle} onPointerMove={wakeControls} onTouchStart={wakeControls}>
+		<SafeAreaView className="player-controls" style={[StyleSheet.absoluteFill]} onPointerMove={wakeControls} onTouchStart={wakeControls}>
 			<AnimatedView className={"player-controls-ctn"} pointerEvents={controlsVisible ? "auto" : "none"}>
 				<FocusGuide trapFocusUp trapFocusLeft trapFocusRight className={"player-header"}>
 					<AnimatedView className={"player-header-ctn"} style={animOpacityStyle}>
 						<ControlButton
 							onPress={props.onClosePlayer}
 							icon="xmark"
-							className={`close-btn`}
+							className={"plyr-close-btn"}
 							iconSize={sizes.span2}
 							backgroundColor={"#0000005f"}
 							style={CLOSE_BUTTON_STYLE}
 							{...closeButtonFocus}
 						/>
-						<Text className={"only-landscape player-title"}>{props.videoTitle}</Text>
+						<Text className={"player-title"}>{props.videoTitle}</Text>
 						{HeaderRightElement}
 					</AnimatedView>
 				</FocusGuide>
 
-				<View className={"player-actions"}>
+				<View className={"player-gestures"} style={statusHiddenStyle}>
+					<PlayerGesture ref={seekBackwardGestureRef} icon={"backward_10_seconds"} onPress={seekBackward} autoHide disable={props.playerState.isLive} />
+					<PlayerGesture
+						ref={playGestureRef}
+						icon={props.playerState.paused ? "play" : "pause"}
+						onPress={togglePlay}
+						tap={1}
+						autoHide={!props.playerState.paused}
+					/>
+					<PlayerGesture ref={seekForwardGestureRef} icon={"forward_10_seconds"} onPress={seekForward} autoHide disable={props.playerState.isLive} />
+				</View>
+
+				<View className={"player-actions"} style={actionsStyle}>
 					{state.type !== "idle" && (
 						<View className={"player-status-overlay"}>
 							<ComponentStatus state={state.type} messages={state.message} enteringAnimation={ZoomIn} />
 						</View>
 					)}
-
-					<View className={"player-gestures"} style={statusHiddenStyle}>
-						<PlayerGesture ref={seekBackwardGestureRef} icon={"backward_10_seconds"} onPress={seekBackward} autoHide disable={props.playerState.isLive} />
-						<PlayerGesture
-							ref={playGestureRef}
-							icon={props.playerState.paused ? "play" : "pause"}
-							onPress={togglePlay}
-							tap={1}
-							autoHide={!props.playerState.paused}
-						/>
-						<PlayerGesture ref={seekForwardGestureRef} icon={"forward_10_seconds"} onPress={seekForward} autoHide disable={props.playerState.isLive} />
-					</View>
 
 					<AnimatedView className={"player-menus"} style={menusStyle}>
 						<PlayerDropdown

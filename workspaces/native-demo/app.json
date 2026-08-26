@@ -1,0 +1,46 @@
+{
+	"expo": {
+		"name": "CrossPlayerDemo",
+		"slug": "cross-player-demo",
+		"scheme": "crossplayerdemo",
+		"version": "1.0.0",
+		"orientation": "default",
+		"userInterfaceStyle": "automatic",
+		"newArchEnabled": true,
+		"ios": {
+			"supportsTablet": true,
+			"bundleIdentifier": "com.crossplayer.demo"
+		},
+		"android": {
+			"edgeToEdgeEnabled": true,
+			"permissions": [],
+			"package": "com.crossplayer.demo"
+		},
+		"web": {
+			"bundler": "metro",
+			"output": "static"
+		},
+		"plugins": [
+			[
+				"expo-router",
+				{
+					"root": "./src/app"
+				}
+			],
+			"react-native-video",
+			[
+				"expo-build-properties",
+				{
+					"android": {
+						"minSdkVersion": 24
+					}
+				}
+			],
+			"expo-splash-screen"
+		],
+		"experiments": {
+			"typedRoutes": true,
+			"reactCompiler": true
+		}
+	}
+}
