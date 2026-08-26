@@ -315,6 +315,8 @@
 	flex-direction: column;
 	justify-content: center;
 	align-items: center;
+
+	margin-top: calc((var(--span1b-size) + var(--span2-size)) * 2);
 }
 
 .component-status-title-txt {

@@ -13,7 +13,7 @@ export default function RootLayout() {
 			<KeyboardProvider>
 				<Stack screenOptions={{ headerShown: false, freezeOnBlur: true }}>
 					<Stack.Screen name="index" />
-					<Stack.Screen name="play" />
+					<Stack.Screen name="play" options={{ freezeOnBlur: true }} />
 				</Stack>
 			</KeyboardProvider>
 		</GestureHandlerRootView>

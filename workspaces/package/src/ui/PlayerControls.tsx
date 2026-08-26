@@ -8,7 +8,7 @@ import useWebKeyboard from "../hooks/useWebKeyboard";
 import useTVRemote from "../hooks/useTVRemote";
 import { useResponsiveSize } from "../hooks/useResponsiveSize";
 import { Platform, StyleSheet, View as RNView, BackHandler } from "react-native";
-import { View, Text, SafeAreaView, AnimatedView } from "./styled";
+import { View, Text, AnimatedView } from "./styled";
 import Button from "./Button";
 import { sky, zinc } from "tailwindcss/colors";
 import PlayerGesture, { PlayerGestureRef } from "./PlayerGesture";
@@ -300,12 +300,13 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 	}, []); // Run once on mount
 
 	// FIX 4: Handle hardware back button on Android to prevent issue with the SafeAreaView => where you see wierd padding onscreen after pressing backhandler
+	// NOTE: StatusBar in the VideoPlayer UI was causing issue too and upgraded to react-native-system-navigation-bar@3.0.0
 	useEffect(() => {
 		const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+			props.controls.setFullscreen(false);
 			props.onClosePlayer?.();
 			return true;
 		});
-
 		return () => subscription.remove();
 	}, [props.onClosePlayer]);
 
@@ -395,7 +396,7 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 	const closeButtonFocus = useMemo(() => (Platform.isTV && playButtonNode ? ({ nextFocusDown: playButtonNode } as object) : {}), [playButtonNode]);
 
 	return (
-		<SafeAreaView className="player-controls" style={[StyleSheet.absoluteFill]} onPointerMove={wakeControls} onTouchStart={wakeControls}>
+		<View className="player-controls" style={[StyleSheet.absoluteFill]} onPointerMove={wakeControls} onTouchStart={wakeControls}>
 			<AnimatedView className={"player-controls-ctn"} pointerEvents={controlsVisible ? "auto" : "none"}>
 				<FocusGuide trapFocusUp trapFocusLeft trapFocusRight className={"player-header"}>
 					<AnimatedView className={"player-header-ctn"} style={animOpacityStyle}>
@@ -602,7 +603,7 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 					</AnimatedView>
 				</FocusGuide>
 			</AnimatedView>
-		</SafeAreaView>
+		</View>
 	);
 });
 PlayerControls.displayName = "PlayerControls";

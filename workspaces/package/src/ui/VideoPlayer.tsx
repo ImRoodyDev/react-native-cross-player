@@ -238,7 +238,7 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 			onPointerMove={handlePointerActivity}
 			onTouchStart={handlePointerActivity}
 		>
-			<StatusBar hidden={playerState.isFullscreen} />
+			{Platform.OS === "ios" && <StatusBar hidden={playerState.isFullscreen} />}
 
 			<Video
 				ref={videoRef}

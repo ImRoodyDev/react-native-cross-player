@@ -1,4 +1,4 @@
-import { StatusBar, Platform, Dimensions } from "react-native";
+import { Platform, Dimensions, StatusBar } from "react-native";
 import { useCallback, useEffect, useState } from "react";
 import SystemNavigationBar from "react-native-system-navigation-bar";
 import Orientation from "react-native-orientation-locker";
@@ -28,16 +28,24 @@ export function useFullscreen(props: UseFullscreenProps): UseFullscreenResult {
 
 		const apply = (landscape: boolean) => {
 			setIsFullscreen(landscape);
-			if (Platform.OS === "android") {
-				if (landscape) {
-					// Hide status + navigation bars; a swipe reveals them briefly, then they re-hide.
-					SystemNavigationBar.stickyImmersive(true);
-				} else {
-					// Leave immersive, but keep the nav bar hidden while the player is on screen.
-					SystemNavigationBar.stickyImmersive(false);
-					SystemNavigationBar.navigationHide();
-				}
+			if (landscape) {
+				// Hide system UI (immersive mode on Android, hide status bar on iOS)
+				// SystemNavigationBar.setImmersive("immersive", true); // Android: hides both bars, swipe to reveal
+				// Alternatively you can use granular methods:
+				SystemNavigationBar.hide("both");
+				// SystemNavigationBar.setStatusBarHidden(true);
+				// SystemNavigationBar.setNavigationBarHidden(true);
+				// StatusBar.setHidden(true); // iOS / Android if not using the library
+			} else {
+				// Show system UI again
+				// SystemNavigationBar.setImmersive("immersive", false);
+				// Or:
+				SystemNavigationBar.show("both");
+				// SystemNavigationBar.setStatusBarHidden(false);
+				// SystemNavigationBar.setNavigationBarHidden(false);
+				// StatusBar.setHidden(false);
 			}
+
 			// iOS: <StatusBar hidden={isFullscreen}> in VideoPlayer follows the state set above.
 		};
 
@@ -47,16 +55,18 @@ export function useFullscreen(props: UseFullscreenProps): UseFullscreenResult {
 
 		return () => {
 			subscription?.remove();
-			// Restore normal system bars when the player is destroyed (Android only).
-			if (Platform.OS === "android") {
-				SystemNavigationBar.stickyImmersive(false);
-				SystemNavigationBar.navigationShow();
-			}
+			// Hide system UI (immersive mode on Android, hide status bar on iOS)
+			// SystemNavigationBar.setImmersive("immersive", true); // Android: hides both bars, swipe to reveal
+			// Alternatively you can use granular methods:
+			SystemNavigationBar.hide("both");
+			// SystemNavigationBar.setStatusBarHidden(true);
+			// SystemNavigationBar.setNavigationBarHidden(true);
 		};
 	}, []);
 
 	const onFullscreenEnter = useCallback(() => {
 		setIsFullscreen(true);
+		SystemNavigationBar.hide("both");
 		// iOS has no immersive API; hide the status bar directly. On Android the effect
 		// above already owns bar visibility (edge-to-edge makes setHidden unreliable there).
 		if (Platform.OS !== "android") StatusBar.setHidden(true);
@@ -65,6 +75,7 @@ export function useFullscreen(props: UseFullscreenProps): UseFullscreenResult {
 
 	const onFullscreenExit = useCallback(() => {
 		setIsFullscreen(false);
+		SystemNavigationBar.show("both");
 		if (Platform.OS !== "android") StatusBar.setHidden(false);
 		Orientation.unlockAllOrientations();
 	}, []);
