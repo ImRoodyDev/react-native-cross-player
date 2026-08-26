@@ -510,18 +510,25 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 			if (sourceId === -1 || videoSources.length < 1) return;
 
 			const isBuffering = data.isBuffering;
-			if (!isBuffering && bufferTimeoutRef.current) clearTimeout(bufferTimeoutRef.current);
 
-			bufferTimeoutRef.current = setTimeout(
-				() => {
-					controlsRef.current?.setControlState({
-						type: isBuffering ? "loading" : "idle",
-						message: isBuffering ? t("LOADING") : ""
-					});
-					bufferTimeoutRef.current = undefined;
-				},
-				isBuffering ? 500 : 0
-			);
+			// Cancel any pending debounce on every transition, so a stale timer from an intermediate
+			// `true` (buffering toggles during a seek) can't strand the controls in loading.
+			if (bufferTimeoutRef.current) {
+				clearTimeout(bufferTimeoutRef.current);
+				bufferTimeoutRef.current = undefined;
+			}
+
+			if (!isBuffering) {
+				// Buffering ended → clear our own loading immediately, but never stomp an error state.
+				if (controlsRef.current?.state.type === "loading") controlsRef.current?.setControlState({ type: "idle", message: "" });
+				return;
+			}
+
+			// Buffering started → debounce before showing the spinner so brief stalls don't flash it.
+			bufferTimeoutRef.current = setTimeout(() => {
+				bufferTimeoutRef.current = undefined;
+				controlsRef.current?.setControlState({ type: "loading", message: t("LOADING") });
+			}, 500);
 		},
 		[sourceId, videoSources]
 	);
