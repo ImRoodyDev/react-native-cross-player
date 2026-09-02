@@ -67,9 +67,9 @@ const PlayerGesture = forwardRef<PlayerGestureRef, Props>((props, ref) => {
 	if (props.disable) return null;
 
 	return (
-		<View className={"player-gesture"}>
+		<View className={"cnp-player-gesture"}>
 			<GestureDetector gesture={doubleTap}>
-				<View className={"player-gesture-ctn"}>
+				<View className={"cnp-player-gesture-ctn"}>
 					<AnimatedView
 						style={[
 							{
@@ -77,7 +77,7 @@ const PlayerGesture = forwardRef<PlayerGestureRef, Props>((props, ref) => {
 								transform: [{ scale: animatedScale }]
 							}
 						]}
-						className={"player-gesture-icon"}
+						className={"cnp-player-gesture-icon"}
 					/>
 					<AnimatedView style={{ opacity: animatedOpacity }}>{Icons[props.icon]({ color: "white", size: h1 })}</AnimatedView>
 				</View>

@@ -49,11 +49,30 @@ const EVENTS_EXAMPLE = `<PlayerControls
 
 const PROPS: PropRow[] = [
 	{ name: 'videoTitle', type: 'string', required: true, description: 'Title rendered in the controls header.' },
-	{ name: 'controls', type: 'VideoControls', required: true, description: 'Controller methods for source, subtitle, rate, volume, and playback.' },
-	{ name: 'resources', type: 'PlaybackResources', required: true, description: 'Available sources, subtitles, audio tracks, qualities, and rates.' },
-	{ name: 'playerState', type: 'PlayerState', required: true, description: 'Current playback state used to render active buttons and menus.' },
+	{
+		name: 'controls',
+		type: 'VideoControls',
+		required: true,
+		description: 'Controller methods for source, subtitle, rate, volume, and playback.',
+	},
+	{
+		name: 'resources',
+		type: 'PlaybackResources',
+		required: true,
+		description: 'Available sources, subtitles, audio tracks, qualities, and rates.',
+	},
+	{
+		name: 'playerState',
+		type: 'PlayerState',
+		required: true,
+		description: 'Current playback state used to render active buttons and menus.',
+	},
 	{ name: 'nextLabel', type: 'string', description: 'Optional label for a next-video action.' },
-	{ name: 'onControlsVisibilityChange', type: '(visible: boolean) => void', description: 'Called when the controls overlay appears or hides.' },
+	{
+		name: 'onControlsVisibilityChange',
+		type: '(visible: boolean) => void',
+		description: 'Called when the controls overlay appears or hides.',
+	},
 	{ name: 'onClosePlayer', type: '() => void', description: 'Called from the close action.' },
 	{ name: 'onNextVideo', type: '() => void', description: 'Called from the next action.' },
 ];
@@ -84,7 +103,9 @@ function ControlsPreview() {
 				</View>
 			</ComponentPreview>
 			<PropControls
-				controls={[{ type: 'select', label: 'rate', value: rate, options: ['0.5x', '1x', '1.5x', '2x'], onChange: setRate }]}
+				controls={[
+					{ type: 'select', label: 'rate', value: rate, options: ['0.5x', '1x', '1.5x', '2x'], onChange: setRate },
+				]}
 			/>
 		</View>
 	);
@@ -103,7 +124,9 @@ export default function PlayerControlsPage() {
 					title: 'Callbacks',
 					content: (
 						<View className="gap-3">
-							<Callout type="tip">Use visibility callbacks to hide your surrounding app chrome while controls are visible.</Callout>
+							<Callout type="tip">
+								Use visibility callbacks to hide your surrounding app chrome while controls are visible.
+							</Callout>
 							<CodeBlock code={EVENTS_EXAMPLE} language="tsx" />
 						</View>
 					),

@@ -87,7 +87,7 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 	const controlsRef = React.useRef<PlayerControlsRef>(null);
 	const playerViewRef = React.useRef<RNView>(null);
 
-	// `.video-controls-on` only shifts native <track> cues on web (::-webkit-media-text-track-container).
+	// `.cnp-video-controls-on` only shifts native <track> cues on web (::-webkit-media-text-track-container).
 	// Off web nothing reads it, so don't hold it in state there: every show/hide would otherwise
 	// re-render <Video> + the whole controls tree.
 	const [controlsVisible, setControlsVisible] = React.useState(true);
@@ -233,7 +233,7 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 	return (
 		<View
 			id={"video-player"}
-			className={clsx("video-player responsive-vars", controlsVisible && "video-controls-on")}
+			className={clsx("cnp-video-player responsive-vars", controlsVisible && "cnp-video-controls-on")}
 			ref={playerViewRef}
 			style={rootStyle}
 			onPointerMove={handlePointerActivity}

@@ -47,15 +47,15 @@ const TimeDisplayer = forwardRef(({ currentTime, fullTime, visibility, className
 	);
 
 	return (
-		<AnimatedView ref={ref} style={styles.container} className={clsx("player-time-displayer", className)}>
-			<Text selectable={false} style={styles.timeText} className={"player-time-text"}>
+		<AnimatedView ref={ref} style={styles.container} className={clsx("cnp-player-time-displayer", className)}>
+			<Text selectable={false} style={styles.timeText} className={"cnp-player-time-text"}>
 				{formatTime(currentDuration)}
 			</Text>
-			<Text selectable={false} className={"player-time-separator"}>
+			<Text selectable={false} className={"cnp-player-time-separator"}>
 				{" "}
 				-{" "}
 			</Text>
-			<Text selectable={false} style={styles.timeText} className={"player-time-text"}>
+			<Text selectable={false} style={styles.timeText} className={"cnp-player-time-text"}>
 				{formatTime(fullDuration)}
 			</Text>
 		</AnimatedView>
