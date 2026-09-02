@@ -21,7 +21,6 @@ import { formatTime } from "../utils/helpers";
 import TimeDisplayer from "./TimeDisplayer";
 import { PlaybackResources, PlayerState, VideoControls, AudioTrack, QualityLevel } from "../types/player";
 import { SubtitleSource, VideoSource } from "../types/media";
-import SystemNavigationBar from "react-native-system-navigation-bar";
 
 export type ControlsProps = {
 	videoTitle: string;
@@ -157,7 +156,10 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 		// BUG FIX: this will let the navigator act like immersive mode,
 		// because when add immersive mode in the navigator it causes issue with the screen size and insets
 		const { width, height } = Dimensions.get("window");
-		SystemNavigationBar[width > height && Platform.OS !== "web" ? "hide" : "show"]("both");
+		if (Platform.OS !== "web") {
+			// using require so it doesnt hit metro react-native-system-navigation-bar
+			require("react-native-system-navigation-bar").default[width > height ? "hide" : "show"]("both");
+		}
 
 		visibilityOpacity.value = withTiming(0, { duration: 500, easing: Easing.ease });
 		controlsVisibleRef.current = false;
