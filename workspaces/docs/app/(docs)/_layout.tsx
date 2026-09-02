@@ -4,6 +4,7 @@ import { Slot } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Navbar } from '../../components/Navbar';
 import { Sidebar } from '../../components/Sidebar';
+import { Seo } from '../../components/Seo';
 import { useHydratedViewportWidth } from '../../utils/useHydratedViewportWidth';
 
 export default function DocsLayout() {
@@ -11,8 +12,8 @@ export default function DocsLayout() {
 	const isWide = viewportWidth >= 768;
 	const [drawerOpen, setDrawerOpen] = useState(false);
 
-	if (Platform.OS === 'web' && isWide) {
-		return (
+	const content =
+		Platform.OS === 'web' && isWide ? (
 			<View style={[styles.root, webStyles.root as any]}>
 				<View style={webStyles.navbarFixed}>
 					<Navbar />
@@ -26,19 +27,23 @@ export default function DocsLayout() {
 					</View>
 				</View>
 			</View>
+		) : (
+			<SafeAreaView style={styles.root} edges={['top']}>
+				<Navbar onMenuPress={() => setDrawerOpen(true)} />
+				<Modal visible={drawerOpen} transparent animationType="none" onRequestClose={() => setDrawerOpen(false)}>
+					<MobileDrawer onClose={() => setDrawerOpen(false)} />
+				</Modal>
+				<View style={styles.content}>
+					<Slot />
+				</View>
+			</SafeAreaView>
 		);
-	}
 
 	return (
-		<SafeAreaView style={styles.root} edges={['top']}>
-			<Navbar onMenuPress={() => setDrawerOpen(true)} />
-			<Modal visible={drawerOpen} transparent animationType="none" onRequestClose={() => setDrawerOpen(false)}>
-				<MobileDrawer onClose={() => setDrawerOpen(false)} />
-			</Modal>
-			<View style={styles.content}>
-				<Slot />
-			</View>
-		</SafeAreaView>
+		<>
+			<Seo />
+			{content}
+		</>
 	);
 }
 

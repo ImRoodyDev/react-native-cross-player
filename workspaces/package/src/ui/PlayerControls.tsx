@@ -7,8 +7,8 @@ import { Easing, useAnimatedStyle, useSharedValue, withTiming, ZoomIn } from "re
 import useWebKeyboard from "../hooks/useWebKeyboard";
 import useTVRemote from "../hooks/useTVRemote";
 import { useResponsiveSize } from "../hooks/useResponsiveSize";
-import { Platform, StyleSheet, View as RNView } from "react-native";
-import { View, Text, SafeAreaView, AnimatedView } from "./styled";
+import { Platform, StyleSheet, View as RNView, BackHandler, Dimensions } from "react-native";
+import { View, Text, AnimatedView } from "./styled";
 import Button from "./Button";
 import { sky, zinc } from "tailwindcss/colors";
 import PlayerGesture, { PlayerGestureRef } from "./PlayerGesture";
@@ -151,6 +151,14 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 		// Check CURRENT values, not stale closure values
 		if (latestValuesRef.current.paused || ["error", "loading"].includes(latestValuesRef.current.stateType) || latestValuesRef.current.triggeredDropdown >= 0) {
 			return; // Don't hide
+		}
+
+		// BUG FIX: this will let the navigator act like immersive mode,
+		// because when add immersive mode in the navigator it causes issue with the screen size and insets
+		const { width, height } = Dimensions.get("window");
+		if (Platform.OS !== "web") {
+			// using require so it doesnt hit metro react-native-system-navigation-bar
+			require("react-native-system-navigation-bar").default[width > height ? "hide" : "show"]("both");
 		}
 
 		visibilityOpacity.value = withTiming(0, { duration: 500, easing: Easing.ease });
@@ -299,6 +307,17 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 		};
 	}, []); // Run once on mount
 
+	// FIX 4: Handle hardware back button on Android to prevent issue with the SafeAreaView => where you see wierd padding onscreen after pressing backhandler
+	// NOTE: StatusBar in the VideoPlayer UI was causing issue too and upgraded to react-native-system-navigation-bar@3.0.0
+	useEffect(() => {
+		const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+			props.controls.setFullscreen(false);
+			props.onClosePlayer?.();
+			return true;
+		});
+		return () => subscription.remove();
+	}, [props.onClosePlayer]);
+
 	useImperativeHandle(
 		ref,
 		() => ({
@@ -319,15 +338,13 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 		[state, showControls]
 	);
 
-	// Map Web keyboard events
+	// Map Web keyboard and remote keys events
 	useWebKeyboard({
 		" ": togglePlay,
 		ArrowRight: seekForward,
 		ArrowLeft: seekBackward,
 		f: toggleFullscreen
 	});
-
-	// Map TV remote / D-pad events (no-op off-TV).
 	useTVRemote(
 		{
 			up: showControls,
@@ -364,8 +381,11 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 
 	const statusHiddenStyle = useMemo(() => (state.type !== "idle" ? ({ pointerEvents: "none", opacity: 0 } as const) : undefined), [state.type]);
 	const menusStyle = useMemo(
-		() => [animOpacityStyle, { pointerEvents: Platform.OS === "web" || state.type !== "idle" ? ("none" as const) : ("box-none" as const) }],
-		[animOpacityStyle, state.type]
+		() => [
+			animOpacityStyle,
+			{ pointerEvents: Platform.OS === "web" || (state.type !== "idle" && triggeredDropdown == -1) ? ("none" as const) : ("box-none" as const) }
+		],
+		[animOpacityStyle, triggeredDropdown, state.type]
 	);
 	const actionsStyle = useMemo(() => [{ pointerEvents: Platform.OS === "web" ? ("none" as const) : ("box-none" as const) }], []);
 	const progressStyle = useMemo(() => [animOpacityStyle, { height: sizes.h1 }], [animOpacityStyle, sizes.span6]);
@@ -373,8 +393,8 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 	const sliderContainerStyle = useMemo(() => ({ borderRadius: 999999 }), [sizes.h1]);
 	const sliderTheme = useMemo(
 		() => ({
+			maximumTrackTintColor: "rgba(40, 40, 40, .6)",
 			minimumTrackTintColor: sky[500],
-			maximumTrackTintColor: zinc[700],
 			cacheTrackTintColor: zinc[500],
 			bubbleBackgroundColor: sky[500],
 			...theme
@@ -387,7 +407,7 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 	const closeButtonFocus = useMemo(() => (Platform.isTV && playButtonNode ? ({ nextFocusDown: playButtonNode } as object) : {}), [playButtonNode]);
 
 	return (
-		<SafeAreaView className="player-controls" style={[StyleSheet.absoluteFill]} onPointerMove={wakeControls} onTouchStart={wakeControls}>
+		<View className="player-controls" style={[StyleSheet.absoluteFill]} onPointerMove={wakeControls} onTouchStart={wakeControls}>
 			<AnimatedView className={"player-controls-ctn"} pointerEvents={controlsVisible ? "auto" : "none"}>
 				<FocusGuide trapFocusUp trapFocusLeft trapFocusRight className={"player-header"}>
 					<AnimatedView className={"player-header-ctn"} style={animOpacityStyle}>
@@ -594,7 +614,7 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 					</AnimatedView>
 				</FocusGuide>
 			</AnimatedView>
-		</SafeAreaView>
+		</View>
 	);
 });
 PlayerControls.displayName = "PlayerControls";

@@ -1,7 +1,9 @@
 import React from 'react';
 import { ScrollViewStyleReset } from 'expo-router/html';
+import { publicAsset } from '../utils/publicAsset';
 
 const ROOT_CLASS = 'responsive-vars';
+const FAVICON = publicAsset('img/ctn-square.png');
 
 function withResponsiveRoot(children: React.ReactNode) {
 	if (!React.isValidElement<{ className?: string }>(children)) {
@@ -20,6 +22,9 @@ export default function RootHtml({ children }: { children: React.ReactNode }) {
 				<meta charSet="utf-8" />
 				<meta httpEquiv="X-UA-Compatible" content="IE=edge" />
 				<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+				<meta name="theme-color" content="#09090b" />
+				<link rel="icon" type="image/png" href={FAVICON} />
+				<link rel="apple-touch-icon" href={FAVICON} />
 				<ScrollViewStyleReset />
 			</head>
 			<body className={ROOT_CLASS}>{withResponsiveRoot(children)}</body>

@@ -3,6 +3,7 @@ import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from '
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Navbar } from '../components/Navbar';
+import { Seo } from '../components/Seo';
 import { PlatformBadges } from '../components/PlatformBadges';
 import { ComponentPreview } from '../components/ComponentPreview';
 import { MediaPlayground } from '../components/MediaPlayground';
@@ -93,6 +94,7 @@ export default function HomeScreen() {
 
 	return (
 		<SafeAreaView style={styles.root} edges={['top']}>
+			<Seo />
 			<ScrollView
 				style={styles.scroll}
 				contentContainerStyle={styles.scrollContent}

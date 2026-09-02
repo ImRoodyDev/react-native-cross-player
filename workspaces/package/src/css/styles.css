@@ -285,6 +285,7 @@
 .component-status {
 	width: 100%;
 	height: auto;
+	max-height: 100%;
 	flex: 1;
 }
 
@@ -315,14 +316,16 @@
 	flex-direction: column;
 	justify-content: center;
 	align-items: center;
+
+	margin-top: calc((var(--span1b-size) + var(--span2-size)) * 2);
 }
 
 .component-status-title-txt {
 	max-width: 40vw;
 	color: white;
 	margin-top: var(--span1b-size);
-	font-size: var(--h3-size);
-	font-family: "Montserrat-SemiBold", serif;
+	font-size: var(--h3-size) !important;
+	font-family: "Montserrat-SemiBold", serif !important;
 	font-weight: 600;
 	text-align: center;
 }
@@ -331,8 +334,8 @@
 	max-width: 40vw;
 	color: white;
 	margin-top: var(--span1b-size);
-	font-size: var(--span2-size);
-	font-family: "Montserrat-Medium", serif;
+	font-size: var(--span2-size) !important;
+	font-family: "Montserrat-Medium", serif !important;
 	font-weight: 500;
 	text-align: center;
 }
@@ -357,6 +360,35 @@
 	text-align: center;
 }
 
+/* Mobile Portrait */
+@media only screen and (max-width: 599px) and (orientation: portrait) {
+	.component-status-title-txt {
+		margin-top: var(--span6-size);
+		font-size: var(--span1-size) !important;
+		font-family: "Montserrat-Bold", serif !important;
+	}
+
+	.component-status-txt {
+		margin-top: var(--span6-size);
+		font-size: var(--span4-size) !important;
+		font-family: "Montserrat-Medium", serif !important;
+	}
+}
+
+/* Mobile Landscape */
+@media only screen and (max-width: 1023px) and (max-height: 479px) {
+	.component-status-title-txt {
+		margin-top: var(--span6-size);
+		font-size: var(--span1-size) !important;
+		font-family: "Montserrat-Bold", serif !important;
+	}
+
+	.component-status-txt {
+		margin-top: var(--span6-size);
+		font-size: var(--span4-size) !important;
+		font-family: "Montserrat-Medium", serif !important;
+	}
+}
 /*#endregion  */
 
 /*#region Controls */
@@ -485,12 +517,19 @@
 }
 
 .next-button {
-	height: calc(var(--h1-size) * 1.1) !important;
+	/* height: calc(var(--h1-size) * 1.1) !important; */
+	height: auto;
 	width: calc(var(--h1-size) * 1.1 * 2.81 + var(--span3-size) * 2) !important;
 	padding-left: var(--span3-size) !important;
 	padding-right: var(--span3-size) !important;
-	padding-top: 0 !important;
-	padding-bottom: 0 !important;
+	padding-top: var(--span6-size) !important;
+	padding-bottom: var(--span6-size) !important;
+}
+
+.next-button-txt {
+	color: white;
+	font-size: var(--span3-size);
+	font-family: Montserrat-Medium, sans-serif;
 }
 
 .player-button-text {
@@ -638,6 +677,10 @@
 		font-size: var(--span3-size);
 	}
 
+	.player-dropdown {
+		width: 24vw;
+		max-height: 80%;
+	}
 	.player-dropdown-header {
 		padding-top: var(--span5-size);
 		padding-bottom: var(--span5-size);

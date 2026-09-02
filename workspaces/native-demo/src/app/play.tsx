@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { View, Dimensions } from 'react-native';
 import { CNPLogger, ProxyLogger, VideoPlayer, VideoPlayerRef, VideoSource } from 'react-native-cross-player';
@@ -10,7 +11,7 @@ ProxyLogger.enableDebugging(false);
 const SAMPLE_PLAYER_ID = 'demo-player';
 const initialDummySources: VideoSource[] = [
 	{
-		source: 'https://tears-of-steel-subtitles.s3.amazonaws.com/tos.mp4',
+		source: 'https://tears-of-steel-subtitles.s3.amazonaws.com/toss.mp4',
 		playerId: SAMPLE_PLAYER_ID,
 		label: 'English Source 1',
 		id: 'en-bunny tears-of-steel-main',
@@ -27,6 +28,7 @@ const initialDummySources: VideoSource[] = [
 
 // Reproduces the ztor movies/play screen that OOM-crashes on device.
 export default function Play() {
+	const router = useRouter();
 	const playerRef = useRef<VideoPlayerRef>(null);
 	const [sourceIndex, setSourceIndex] = useState(0);
 	const [sources] = useState<VideoSource[]>(initialDummySources);
@@ -63,6 +65,42 @@ export default function Play() {
 							label: 'French Subtitle',
 							type: 'vtt',
 						},
+						{
+							id: 'fr-2',
+							playerId: SAMPLE_PLAYER_ID,
+							source:
+								'https://raw.githubusercontent.com/ImRoodyDev/react-native-cross-player/refs/heads/alpha-1/workspaces/docs/public/media/tears-fr.vtt',
+							langISO: 'fr',
+							label: 'French Subtitle',
+							type: 'vtt',
+						},
+						{
+							id: 'fr-3',
+							playerId: SAMPLE_PLAYER_ID,
+							source:
+								'https://raw.githubusercontent.com/ImRoodyDev/react-native-cross-player/refs/heads/alpha-1/workspaces/docs/public/media/tears-fr.vtt',
+							langISO: 'fr',
+							label: 'French Subtitle',
+							type: 'vtt',
+						},
+						{
+							id: 'fr-4',
+							playerId: SAMPLE_PLAYER_ID,
+							source:
+								'https://raw.githubusercontent.com/ImRoodyDev/react-native-cross-player/refs/heads/alpha-1/workspaces/docs/public/media/tears-fr.vtt',
+							langISO: 'fr',
+							label: 'French Subtitle',
+							type: 'vtt',
+						},
+						{
+							id: 'fr-5',
+							playerId: SAMPLE_PLAYER_ID,
+							source:
+								'https://raw.githubusercontent.com/ImRoodyDev/react-native-cross-player/refs/heads/alpha-1/workspaces/docs/public/media/tears-fr.vtt',
+							langISO: 'fr',
+							label: 'French Subtitle',
+							type: 'vtt',
+						},
 					],
 					hlsConfig: {
 						debug: false,
@@ -74,7 +112,9 @@ export default function Play() {
 				}}
 				viewStyle={{ width: '100%', height: '100%' }}
 				videoStyle={{ width: '100%', height: '100%' }}
-				onClosePlayer={() => {}}
+				onClosePlayer={() => {
+					router.navigate('/'); // Replace with the actual route for the next video
+				}}
 				onSourceChange={(index) => setSourceIndex(index)}
 				onNextVideo={() => {}}
 			/>

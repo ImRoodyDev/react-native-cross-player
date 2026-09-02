@@ -6,7 +6,7 @@ import Video, { OnProgressData, ReactVideoProps, SubtitleStyle, VideoRef } from 
 import PlayerControls, { ControlsProps, PlayerControlsRef } from "./PlayerControls";
 import { PlayerControllerProps, usePlayerController } from "../hooks/usePlayerController";
 import { Languages, setLanguage } from "../libs/localization";
-import { useResponsiveSize, useResponsiveVars } from "../hooks/useResponsiveSize";
+import { useResponsiveSize, useResponsiveSizeType, useResponsiveVars } from "../hooks/useResponsiveSize";
 import { View } from "./styled";
 import { CNPLogger } from "../utils/logger";
 import clsx from "clsx";
@@ -59,6 +59,8 @@ export type VideoPlayerRef = {
 	getCurrentSubtitleIndex: () => number;
 };
 
+const TracksControlsVisibility = Platform.OS === "web";
+
 const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) => {
 	const {
 		videoTitle,
@@ -88,7 +90,6 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 	// `.video-controls-on` only shifts native <track> cues on web (::-webkit-media-text-track-container).
 	// Off web nothing reads it, so don't hold it in state there: every show/hide would otherwise
 	// re-render <Video> + the whole controls tree.
-	const tracksControlsVisibility = Platform.OS === "web";
 	const [controlsVisible, setControlsVisible] = React.useState(true);
 
 	// Consumer callbacks read through a ref: inline props from the host would otherwise churn the
@@ -104,19 +105,6 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 		onNextVideo,
 		onError: props.onError
 	});
-	useEffect(() => {
-		callbacksRef.current = {
-			onControlVisibilityChange,
-			onSourceChange,
-			onSubtitleChange,
-			onPlaybackChange,
-			onProgress,
-			onEnd,
-			onClosePlayer: props.onClosePlayer,
-			onNextVideo,
-			onError: props.onError
-		};
-	});
 
 	// Identity-stable seam for the controller, which keeps it for the player's lifetime.
 	const handlePlaybackError = useCallback((error: PlayerError) => callbacksRef.current.onError?.(error), []);
@@ -125,7 +113,8 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 	// every `var(--...)` in styles.css resolves on native — otherwise the whole control layout
 	// collapses because `.responsive-vars` is never mounted by a host on native.
 	const responsiveVars = useResponsiveVars();
-	const { h2 } = useResponsiveSize();
+	const screenType = useResponsiveSizeType(); // read to trigger re-render on breakpoint change
+	const { h5, span2, span3, span1 } = useResponsiveSize();
 
 	// Initialize player controller
 	const { nativeVideoProps, playerState, playbackResources, controls } = usePlayerController({
@@ -151,13 +140,10 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 	}, [nativeVideoProps?.onEnd]);
 
 	// Stable handlers handed to PlayerControls.
-	const handleControlsVisibility = useCallback(
-		(visible: boolean) => {
-			if (tracksControlsVisibility) setControlsVisible(visible);
-			callbacksRef.current.onControlVisibilityChange?.(visible);
-		},
-		[tracksControlsVisibility]
-	);
+	const handleControlsVisibility = useCallback((visible: boolean) => {
+		if (TracksControlsVisibility) setControlsVisible(visible);
+		callbacksRef.current.onControlVisibilityChange?.(visible);
+	}, []);
 	const handleClosePlayer = useCallback(() => callbacksRef.current.onClosePlayer?.(), []);
 	const handleNextVideo = useCallback(() => callbacksRef.current.onNextVideo?.(), []);
 
@@ -172,10 +158,31 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 
 	// Stable style/prop objects for the native video view (inline literals churn the prop diff).
 	const videoStyleMerged = useMemo(() => [{ width: "100%", height: "auto", margin: "auto" } as ViewStyle, videoStyle], [videoStyle]);
-	const subtitleStyleMerged = useMemo(() => ({ fontSize: h2, ...subtitleStyle }), [h2, subtitleStyle]);
+	const subtitleStyleMerged = useMemo(() => {
+		if (screenType === "mobile") return { fontSize: span3, ...subtitleStyle };
+		else if (screenType === "mobile_landscape") {
+			return { fontSize: span2, ...subtitleStyle };
+		} else if (screenType === "tablet") {
+			return { fontSize: span1, ...subtitleStyle };
+		}
+		return { fontSize: h5, ...subtitleStyle };
+	}, [h5, span2, span3, span1, screenType, subtitleStyle]);
 	const rootStyle = useMemo(() => [responsiveVars, viewStyle], [responsiveVars, viewStyle]);
 
 	// Callbacks for source and subtitle changes
+	useEffect(() => {
+		callbacksRef.current = {
+			onControlVisibilityChange,
+			onSourceChange,
+			onSubtitleChange,
+			onPlaybackChange,
+			onProgress,
+			onEnd,
+			onClosePlayer: props.onClosePlayer,
+			onNextVideo,
+			onError: props.onError
+		};
+	});
 	useEffect(() => {
 		const source = playbackResources.sources[playerState.sourceIndex];
 		if (source) callbacksRef.current.onSourceChange?.(playerState.sourceIndex, source);
@@ -232,7 +239,7 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 			onPointerMove={handlePointerActivity}
 			onTouchStart={handlePointerActivity}
 		>
-			<StatusBar hidden={playerState.isFullscreen} />
+			{Platform.OS === "ios" && <StatusBar hidden={playerState.isFullscreen} />}
 
 			<Video
 				ref={videoRef}
