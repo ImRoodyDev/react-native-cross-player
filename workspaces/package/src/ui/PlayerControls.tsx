@@ -407,25 +407,25 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 	const closeButtonFocus = useMemo(() => (Platform.isTV && playButtonNode ? ({ nextFocusDown: playButtonNode } as object) : {}), [playButtonNode]);
 
 	return (
-		<View className="player-controls" style={[StyleSheet.absoluteFill]} onPointerMove={wakeControls} onTouchStart={wakeControls}>
-			<AnimatedView className={"player-controls-ctn"} pointerEvents={controlsVisible ? "auto" : "none"}>
-				<FocusGuide trapFocusUp trapFocusLeft trapFocusRight className={"player-header"}>
-					<AnimatedView className={"player-header-ctn"} style={animOpacityStyle}>
+		<View className="cnp-player-controls" style={[StyleSheet.absoluteFill]} onPointerMove={wakeControls} onTouchStart={wakeControls}>
+			<AnimatedView className={"cnp-player-controls-ctn"} pointerEvents={controlsVisible ? "auto" : "none"}>
+				<FocusGuide trapFocusUp trapFocusLeft trapFocusRight className={"cnp-player-header"}>
+					<AnimatedView className={"cnp-player-header-ctn"} style={animOpacityStyle}>
 						<ControlButton
 							onPress={props.onClosePlayer}
 							icon="xmark"
-							className={"plyr-close-btn"}
+							className={"cnp-plyr-close-btn"}
 							iconSize={sizes.span2}
 							backgroundColor={"#0000005f"}
 							style={CLOSE_BUTTON_STYLE}
 							{...closeButtonFocus}
 						/>
-						<Text className={"player-title"}>{props.videoTitle}</Text>
+						<Text className={"cnp-player-title"}>{props.videoTitle}</Text>
 						{HeaderRightElement}
 					</AnimatedView>
 				</FocusGuide>
 
-				<View className={"player-gestures"} style={statusHiddenStyle}>
+				<View className={"cnp-player-gestures"} style={statusHiddenStyle}>
 					<PlayerGesture ref={seekBackwardGestureRef} icon={"backward_10_seconds"} onPress={seekBackward} autoHide disable={props.playerState.isLive} />
 					<PlayerGesture
 						ref={playGestureRef}
@@ -437,14 +437,14 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 					<PlayerGesture ref={seekForwardGestureRef} icon={"forward_10_seconds"} onPress={seekForward} autoHide disable={props.playerState.isLive} />
 				</View>
 
-				<View className={"player-actions"} style={actionsStyle}>
+				<View className={"cnp-player-actions"} style={actionsStyle}>
 					{state.type !== "idle" && (
-						<View className={"player-status-overlay"}>
+						<View className={"cnp-player-status-overlay"}>
 							<ComponentStatus state={state.type} messages={state.message} enteringAnimation={ZoomIn} />
 						</View>
 					)}
 
-					<AnimatedView className={"player-menus"} style={menusStyle}>
+					<AnimatedView className={"cnp-player-menus"} style={menusStyle}>
 						<PlayerDropdown
 							open={triggeredDropdown == 0}
 							title={t("VIDEO_SOURCES")}
@@ -496,7 +496,7 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 					</AnimatedView>
 				</View>
 
-				<AnimatedView className={"player-progress"} style={progressStyle}>
+				<AnimatedView className={"cnp-player-progress"} style={progressStyle}>
 					<Slider
 						progress={playerCurrentTime}
 						minimumValue={playerMinDuration}
@@ -519,13 +519,13 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 					/>
 				</AnimatedView>
 
-				<FocusGuide autoFocus trapFocusLeft trapFocusRight trapFocusDown className={"player-buttons"}>
-					<AnimatedView className={"player-buttons-ctn"} style={animOpacityStyle}>
+				<FocusGuide autoFocus trapFocusLeft trapFocusRight trapFocusDown className={"cnp-player-buttons"}>
+					<AnimatedView className={"cnp-player-buttons-ctn"} style={animOpacityStyle}>
 						<ControlButton
 							ref={setPlayButton}
 							onPress={togglePlay}
 							icon={!props.playerState.paused ? "pause" : "play"}
-							className={`player-button`}
+							className={`cnp-player-button`}
 							iconSize={defaultIconSize}
 							hasTVPreferredFocus={returnFocusPulse}
 						/>
@@ -535,7 +535,7 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 							hideAndDisable={props.playerState.isLive}
 							onPress={seekBackward}
 							icon="backward_10_seconds"
-							className={`only-landscape player-button`}
+							className={`only-landscape cnp-player-button`}
 							iconSize={defaultIconSize}
 						/>
 
@@ -543,14 +543,14 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 							hideAndDisable={props.playerState.isLive}
 							onPress={seekForward}
 							icon="forward_10_seconds"
-							className={`only-landscape player-button`}
+							className={`only-landscape cnp-player-button`}
 							iconSize={defaultIconSize}
 						/>
 
 						<ControlButton
 							onPress={toggleMute}
 							icon={props.playerState.volume == 0 ? "volume_slash" : "volume_high"}
-							className={`only-landscape player-button`}
+							className={`only-landscape cnp-player-button`}
 							iconSize={defaultIconSize}
 						/>
 
@@ -559,30 +559,30 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 								onPress={props.onNextVideo}
 								icon={"next"}
 								text={props.nextLabel || t("NEXT_VIDEO")}
-								className={"only-landscape next-button"}
+								className={"only-landscape cnp-next-button"}
 								iconSize={defaultIconSize}
 							/>
 						)}
 
 						<TimeDisplayer currentTime={playerCurrentTime} fullTime={playerDurationTime} visibility={visibilityOpacity} />
 
-						<View className={"player-buttons-separator"} />
+						<View className={"cnp-player-buttons-separator"} />
 
 						<ControlButton
 							onPress={openRateDropdown}
 							icon="speed"
-							className={`player-button only-landscape`}
+							className={`cnp-player-button only-landscape`}
 							iconSize={defaultIconSize - 4}
 							{...((props.resources.rates.length < 1 || props.playerState.isLive) && HIDDEN_PROPS)}
 						/>
 
-						<ControlButton onPress={openSourceDropdown} icon="globe" className={`player-button`} iconSize={defaultIconSize} />
+						<ControlButton onPress={openSourceDropdown} icon="globe" className={`cnp-player-button`} iconSize={defaultIconSize} />
 
 						{/* Audio track button — hidden when there is only one (or zero) audio tracks */}
 						<ControlButton
 							onPress={openAudioDropdown}
 							icon="audio_wave"
-							className={`player-button`}
+							className={`cnp-player-button`}
 							iconSize={defaultIconSize}
 							{...(props.resources.audioTracks.length <= 1 && HIDDEN_PROPS)}
 						/>
@@ -590,7 +590,7 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 						<ControlButton
 							onPress={openSubtitleDropdown}
 							icon="subtitle"
-							className={`player-button`}
+							className={`cnp-player-button`}
 							iconSize={defaultIconSize}
 							{...(props.resources.subtitles.length === 0 && HIDDEN_PROPS)}
 						/>
@@ -598,7 +598,7 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 						<ControlButton
 							onPress={openQualityDropdown}
 							icon="settings"
-							className={`player-button`}
+							className={`cnp-player-button`}
 							iconSize={defaultIconSize}
 							{...(props.resources.levels.length === 0 && HIDDEN_PROPS)}
 						/>
@@ -607,7 +607,7 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 							<ControlButton
 								onPress={toggleFullscreen}
 								icon={props.playerState.isFullscreen ? "compress" : "expand"}
-								className={`player-button`}
+								className={`cnp-player-button`}
 								iconSize={defaultIconSize}
 							/>
 						)}

@@ -108,7 +108,7 @@ function PlayerDropdown<T>({ title, open, items, onSelect, getItemText, afterSel
 		});
 		opacity.value = withTiming(1, { duration: 200 });
 
-		// Scroll to selected item after opening. Rows are a fixed height (.player-dropdown-item is
+		// Scroll to selected item after opening. Rows are a fixed height (.cnp-player-dropdown-item is
 		// var(--h1-size) tall), so we can center the selection with a plain offset — no virtualization.
 		timeoutRef.current = setTimeout(() => {
 			if (selectedIndex > 0 && selectedIndex < items.length) {
@@ -143,7 +143,7 @@ function PlayerDropdown<T>({ title, open, items, onSelect, getItemText, afterSel
 	);
 	const renderItem = useCallback(
 		({ item, index }: { item: T; index: number }) => (
-			<AnimatedView key={index} className={"player-dropdown-item-ptn"}>
+			<AnimatedView key={index} className={"cnp-player-dropdown-item-ptn"}>
 				<Button
 					onPress={() => onItemPress(item, index)}
 					disabled={!isDropdownOpen}
@@ -155,8 +155,8 @@ function PlayerDropdown<T>({ title, open, items, onSelect, getItemText, afterSel
 					// so the user starts navigating from their active choice instead of the focus
 					// staying stuck on the trigger button behind the dropdown.
 					hasTVPreferredFocus={isDropdownOpen && index === (selectedIndex < 0 ? 0 : selectedIndex)}
-					className="player-dropdown-item"
-					textClassName={"player-dropdown-item-text"}
+					className="cnp-player-dropdown-item"
+					textClassName={"cnp-player-dropdown-item-text"}
 					text={getItemText(item)}
 					borderRadius={8}
 					textColor={"white"}
@@ -165,7 +165,7 @@ function PlayerDropdown<T>({ title, open, items, onSelect, getItemText, afterSel
 					selectedBackgroundColor={zinc[700]}
 					pressedBackgroundColor={zinc[800]}
 				/>
-				{index == selectedIndex && <View className={"player-dropdown-item-line"} />}
+				{index == selectedIndex && <View className={"cnp-player-dropdown-item-line"} />}
 			</AnimatedView>
 		),
 		[onItemPress, selectedIndex, getItemText, isDropdownOpen]
@@ -186,13 +186,13 @@ function PlayerDropdown<T>({ title, open, items, onSelect, getItemText, afterSel
 	);
 
 	return (
-		<AnimatedView className="player-dropdown" style={[animatedStyle, { pointerEvents: "auto" }]}>
-			{isDropdownOpen && <View className={"player-dropdown-touch-area"} onTouchStart={closeDropdown} onPointerDown={closeDropdown} />}
-			<View className={"player-dropdown-bg"} />
+		<AnimatedView className="cnp-player-dropdown" style={[animatedStyle, { pointerEvents: "auto" }]}>
+			{isDropdownOpen && <View className={"cnp-player-dropdown-touch-area"} onTouchStart={closeDropdown} onPointerDown={closeDropdown} />}
+			<View className={"cnp-player-dropdown-bg"} />
 
-			<View className={"player-dropdown-header"}>
-				<Text className={"player-dropdown-title"}>{title}</Text>
-				<View className={"player-dropdown-header-line"} />
+			<View className={"cnp-player-dropdown-header"}>
+				<Text className={"cnp-player-dropdown-title"}>{title}</Text>
+				<View className={"cnp-player-dropdown-header-line"} />
 			</View>
 
 			{/*
@@ -206,7 +206,7 @@ function PlayerDropdown<T>({ title, open, items, onSelect, getItemText, afterSel
 				trapFocusRight={isDropdownOpen}
 				trapFocusDown={isDropdownOpen}
 				trapFocusUp={isDropdownOpen}
-				className={"player-dropdown-scroll-ptn"}
+				className={"cnp-player-dropdown-scroll-ptn"}
 			>
 				{/*
 			  Plain ScrollView (not FlatList): this list is small and lives inside the app's page
@@ -214,8 +214,8 @@ function PlayerDropdown<T>({ title, open, items, onSelect, getItemText, afterSel
 			  breaks windowing. nestedScrollEnabled lets the inner list scroll on Android.
 			*/}
 				<ScrollView
-					className={"player-dropdown-scroll"}
-					contentContainerClassName={"player-dropdown-items"}
+					className={"cnp-player-dropdown-scroll cnp-nice-scroll"}
+					contentContainerClassName={"cnp-player-dropdown-items"}
 					ref={scrollRef}
 					scrollEnabled={isDropdownOpen}
 					nestedScrollEnabled

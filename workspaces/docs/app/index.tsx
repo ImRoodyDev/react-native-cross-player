@@ -20,7 +20,8 @@ const STATS = [
 const FEATURES = [
 	{
 		title: 'Player UI',
-		description: 'VideoPlayer ships with a complete controls overlay for playback, subtitles, quality, source, rate, and fullscreen.',
+		description:
+			'VideoPlayer ships with a complete controls overlay for playback, subtitles, quality, source, rate, and fullscreen.',
 		accent: '#ff3d7f',
 	},
 	{
@@ -111,8 +112,7 @@ export default function HomeScreen() {
 						{ paddingTop: isWide ? 96 : 60, paddingBottom: isWide ? 80 : 56 },
 						Platform.OS === 'web'
 							? ({
-									backgroundImage:
-										`linear-gradient(180deg, rgba(9,9,11,0.16) 0%, rgba(9,9,11,0.36) 52%, #09090b 100%), url("${publicAsset('img/background.png')}")`,
+									backgroundImage: `linear-gradient(180deg, rgba(9,9,11,0.16) 0%, rgba(9,9,11,0.36) 52%, #09090b 100%), url("${publicAsset('img/background.png')}")`,
 									backgroundPosition: 'center top',
 									backgroundRepeat: 'no-repeat',
 									backgroundSize: 'cover',
@@ -126,7 +126,11 @@ export default function HomeScreen() {
 					</View>
 
 					<View style={[styles.heroIconWrap, { width: isWide ? 132 : 96, height: isWide ? 132 : 96 }]}>
-						<Image source={{ uri: publicAsset('img/ctn-icon.png') }} style={styles.heroIconImage} resizeMode="contain" />
+						<Image
+							source={{ uri: publicAsset('img/ctn-icon.png') }}
+							style={styles.heroIconImage}
+							resizeMode="contain"
+						/>
 					</View>
 
 					<Text
@@ -207,7 +211,12 @@ export default function HomeScreen() {
 					</View>
 					<View style={styles.componentsGrid}>
 						{COMPONENT_CARDS.map((card) => (
-							<ComponentCard key={card.name} {...card} cardWidth={cardWidth} onPress={() => router.push(card.href as any)} />
+							<ComponentCard
+								key={card.name}
+								{...card}
+								cardWidth={cardWidth}
+								onPress={() => router.push(card.href as any)}
+							/>
 						))}
 					</View>
 				</View>
@@ -234,7 +243,11 @@ function InstallSnippet() {
 			<Text style={styles.installCmd} numberOfLines={1}>
 				{cmd}
 			</Text>
-			<Pressable onPress={handleCopy} accessibilityRole="button" style={({ pressed }) => [styles.copyBtn, pressed && { opacity: 0.6 }]}>
+			<Pressable
+				onPress={handleCopy}
+				accessibilityRole="button"
+				style={({ pressed }) => [styles.copyBtn, pressed && { opacity: 0.6 }]}
+			>
 				<Text style={styles.copyBtnText}>{copied ? 'Copied' : 'Copy'}</Text>
 			</Pressable>
 		</View>
@@ -306,7 +319,14 @@ const styles = StyleSheet.create({
 		marginBottom: 18,
 	},
 	heroIconImage: { width: '100%', height: '100%' },
-	headline: { color: '#ffffff', fontWeight: '800', textAlign: 'center', letterSpacing: 0, marginBottom: 20, maxWidth: '86%' },
+	headline: {
+		color: '#ffffff',
+		fontWeight: '800',
+		textAlign: 'center',
+		letterSpacing: 0,
+		marginBottom: 20,
+		maxWidth: '86%',
+	},
 	subhead: { color: '#f4f4f5', textAlign: 'center', lineHeight: 28, marginBottom: 28 },
 	badgesRow: { marginBottom: 28 },
 	installWrap: { width: '100%', maxWidth: 520, marginBottom: 32 },
@@ -372,7 +392,14 @@ const styles = StyleSheet.create({
 	statLabel: { color: '#52525b', fontSize: 11, fontWeight: '500', marginTop: 2, textTransform: 'uppercase' },
 	section: { paddingVertical: 64 },
 	sectionHeader: { alignItems: 'center', marginBottom: 40 },
-	sectionTitle: { color: '#ffffff', fontSize: 32, fontWeight: '700', textAlign: 'center', marginBottom: 10, letterSpacing: 0 },
+	sectionTitle: {
+		color: '#ffffff',
+		fontSize: 32,
+		fontWeight: '700',
+		textAlign: 'center',
+		marginBottom: 10,
+		letterSpacing: 0,
+	},
 	sectionSub: { color: '#52525b', fontSize: 15, textAlign: 'center', lineHeight: 24, maxWidth: 480 },
 	grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
 	featureCard: {
@@ -387,8 +414,23 @@ const styles = StyleSheet.create({
 	featureTitle: { color: '#ffffff', fontSize: 15, fontWeight: '600', marginBottom: 6 },
 	featureDesc: { color: '#71717a', fontSize: 13, lineHeight: 20 },
 	previewWrap: { width: '100%', maxWidth: 1080, alignSelf: 'center' },
-	componentsGrid: { width: '100%', maxWidth: 1100, alignSelf: 'center', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 16 },
-	componentCard: { backgroundColor: '#0f0f12', borderWidth: 1, borderRadius: 14, overflow: 'hidden', minHeight: 160, transitionDuration: '180ms' },
+	componentsGrid: {
+		width: '100%',
+		maxWidth: 1100,
+		alignSelf: 'center',
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		justifyContent: 'center',
+		gap: 16,
+	},
+	componentCard: {
+		backgroundColor: '#0f0f12',
+		borderWidth: 1,
+		borderRadius: 14,
+		overflow: 'hidden',
+		minHeight: 160,
+		transitionDuration: '180ms',
+	},
 	componentCardHovered: { backgroundColor: '#141418', transform: [{ translateY: -3 }] },
 	componentCardStrip: { height: 3, width: '100%' },
 	componentCardBody: { padding: 18, flex: 1, justifyContent: 'space-between' },

@@ -91,8 +91,7 @@ export const ROUTE_META: Record<string, Meta> = {
 	},
 	'/reference/types-utilities': {
 		title: 'Types & Utilities | React Native Cross Player',
-		description:
-			'TypeScript types and utilities exported by react-native-cross-player for typed player configuration.',
+		description: 'TypeScript types and utilities exported by react-native-cross-player for typed player configuration.',
 	},
 };
 

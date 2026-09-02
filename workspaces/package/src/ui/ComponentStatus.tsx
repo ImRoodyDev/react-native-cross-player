@@ -41,14 +41,14 @@ function ComponentStatus(props: ComponentStatusProps) {
 						numberOfLines={index == 0 ? 1 : 4}
 						ellipsizeMode={"tail"}
 						selectable={false}
-						className={index == 0 && text.length < 5 ? "component-status-title-txt" : "component-status-txt"}
+						className={index == 0 && text.length < 5 ? "cnp-component-status-title-txt" : "cnp-component-status-txt"}
 					>
 						{text}
 					</Text>
 				));
 			} else {
 				return (
-					<Text numberOfLines={4} ellipsizeMode={"tail"} selectable={false} className="component-status-txt">
+					<Text numberOfLines={4} ellipsizeMode={"tail"} selectable={false} className="cnp-component-status-txt">
 						{props.messages || ""}
 						{extra}
 					</Text>
@@ -67,33 +67,36 @@ function ComponentStatus(props: ComponentStatusProps) {
 	}, [screenType, h1, h2]);
 
 	return (
-		<AnimatedView entering={props.enteringAnimation || FadeInLeft} className={"component-status"} style={{ pointerEvents: "box-none" }}>
-			<View className={"component-status-ctn"} style={[{ pointerEvents: "box-none", flexBasis: props.flexBasic }, Platform.OS !== "web" && { flexGrow: 1 }]}>
+		<AnimatedView entering={props.enteringAnimation || FadeInLeft} className={"cnp-component-status"} style={{ pointerEvents: "box-none" }}>
+			<View
+				className={"cnp-component-status-ctn"}
+				style={[{ pointerEvents: "box-none", flexBasis: props.flexBasic }, Platform.OS !== "web" && { flexGrow: 1 }]}
+			>
 				{props.state == "loading" && (
-					<View className="component-status-loading">
+					<View className="cnp-component-status-loading">
 						<Spinner size={iconSize} strokeWidth={Math.max(outlineWidth, 2) + 1} />
 						{textElement("...")}
 					</View>
 				)}
 
 				{props.state == "succeed" && (
-					<View className="component-status-succeed">
-						<Icons.success className={"component-status-icon"} color={green["500"]} size={iconSize} />
+					<View className="cnp-component-status-succeed">
+						<Icons.success className={"cnp-component-status-icon"} color={green["500"]} size={iconSize} />
 					</View>
 				)}
 
 				{props.state == "error" && (
 					<>
-						<View className="component-status-failed">
-							<Icons.danger className={"component-status-icon"} color={red["500"]} size={iconSize} />
+						<View className="cnp-component-status-failed">
+							<Icons.danger className={"cnp-component-status-icon"} color={red["500"]} size={iconSize} />
 						</View>
 						{textElement()}
 						{(props.enableOk || props.onOkPress) && (
 							<Button
 								onPress={props.onOkPress}
 								text={t(props.okText || "OK")}
-								className="component-status-btn"
-								textClassName="component-status-btn-text"
+								className="cnp-component-status-btn"
+								textClassName="cnp-component-status-btn-text"
 								icon={props.okIcon}
 								borderRadius={99999}
 								iconSize={span2}

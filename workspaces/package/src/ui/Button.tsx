@@ -73,7 +73,7 @@ const Button = React.forwardRef((props: ButtonProps, ref?: Ref<RNView>) => {
 				<>
 					{icon &&
 						Icons[icon]({
-							className: clsx("base-btn-icon", joinClsx(className?.split(" ").toReversed()[0], "icon")),
+							className: clsx("cnp-base-btn-icon", joinClsx(className?.split(" ").toReversed()[0], "icon")),
 							color: currentTextColor as string,
 							size: iconSize
 						})}
@@ -82,7 +82,7 @@ const Button = React.forwardRef((props: ButtonProps, ref?: Ref<RNView>) => {
 							selectable={false}
 							numberOfLines={1}
 							adjustsFontSizeToFit
-							className={clsx("base-btn-txt", joinClsx(className, "txt"), textClassName)}
+							className={clsx("cnp-base-btn-txt", joinClsx(className, "txt"), textClassName)}
 							style={[textStyle, { color: currentTextColor }]}
 						>
 							{text}

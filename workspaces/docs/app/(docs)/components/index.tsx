@@ -34,7 +34,8 @@ const COMPONENT_GROUPS = [
 			{
 				name: 'usePlayerController',
 				href: '/components/use-player-controller',
-				description: 'Hook that returns native video props, player state, discovered resources, and imperative controls.',
+				description:
+					'Hook that returns native video props, player state, discovered resources, and imperative controls.',
 				platforms: ['ios', 'android', 'web', 'tv'] as Platform[],
 			},
 			{
@@ -52,7 +53,11 @@ export default function ComponentsIndexPage() {
 	const isWide = width >= 900;
 
 	return (
-		<ScrollView className="flex-1 bg-zinc-950" contentContainerStyle={{ paddingBottom: 80 }} showsVerticalScrollIndicator>
+		<ScrollView
+			className="flex-1 bg-zinc-950"
+			contentContainerStyle={{ paddingBottom: 80 }}
+			showsVerticalScrollIndicator
+		>
 			<View className="px-6 pt-10 pb-4" style={{ maxWidth: 768 }}>
 				<Text className="text-4xl font-bold text-white mb-3">Components</Text>
 				<Text className="text-zinc-400 text-base leading-7 mb-10">
