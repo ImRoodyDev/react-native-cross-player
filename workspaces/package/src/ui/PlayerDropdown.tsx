@@ -186,7 +186,7 @@ function PlayerDropdown<T>({ title, open, items, onSelect, getItemText, afterSel
 	);
 
 	return (
-		<AnimatedView className="player-dropdown" style={[animatedStyle]}>
+		<AnimatedView className="player-dropdown" style={[animatedStyle, { pointerEvents: "auto" }]}>
 			{isDropdownOpen && <View className={"player-dropdown-touch-area"} onTouchStart={closeDropdown} onPointerDown={closeDropdown} />}
 			<View className={"player-dropdown-bg"} />
 

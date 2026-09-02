@@ -1,5 +1,5 @@
 // External imports
-import { ComponentProps, useCallback } from "react";
+import { ComponentProps, useCallback, useMemo } from "react";
 import { DimensionValue, Platform } from "react-native";
 import Animated, { FadeInLeft } from "react-native-reanimated";
 
@@ -11,7 +11,7 @@ import { StateType } from "../hooks/useComponentState";
 import Button from "./Button";
 import Spinner from "./Spinner";
 import { LocalizationKeys, t } from "../libs/localization";
-import { useResponsiveSize } from "../hooks/useResponsiveSize";
+import { useResponsiveSize, useResponsiveSizeType } from "../hooks/useResponsiveSize";
 import { green, red, zinc } from "tailwindcss/colors";
 import { View, Text, AnimatedView } from "./styled";
 
@@ -29,7 +29,8 @@ type ComponentStatusProps = {
 };
 
 function ComponentStatus(props: ComponentStatusProps) {
-	const { h1, span2 } = useResponsiveSize();
+	const screenType = useResponsiveSizeType();
+	const { h1, span2, h2, outlineWidth } = useResponsiveSize();
 
 	const textElement = useCallback(
 		(extra: string = "") => {
@@ -57,26 +58,34 @@ function ComponentStatus(props: ComponentStatusProps) {
 		[props.messages]
 	);
 
+	const iconSize = useMemo(() => {
+		if (screenType == "mobile" || screenType == "mobile_landscape") {
+			return h2;
+		} else {
+			return h1 * 1.3;
+		}
+	}, [screenType, h1, h2]);
+
 	return (
-		<AnimatedView entering={props.enteringAnimation || FadeInLeft} className={"component-status"}>
-			<View className={"component-status-ctn"} style={[{ flexBasis: props.flexBasic }, Platform.OS !== "web" && { flexGrow: 1 }]}>
+		<AnimatedView entering={props.enteringAnimation || FadeInLeft} className={"component-status"} style={{ pointerEvents: "box-none" }}>
+			<View className={"component-status-ctn"} style={[{ pointerEvents: "box-none", flexBasis: props.flexBasic }, Platform.OS !== "web" && { flexGrow: 1 }]}>
 				{props.state == "loading" && (
 					<View className="component-status-loading">
-						<Spinner size={h1 * 1.2} strokeWidth={h1 * 0.1 + 1} />
+						<Spinner size={iconSize} strokeWidth={Math.max(outlineWidth, 2) + 1} />
 						{textElement("...")}
 					</View>
 				)}
 
 				{props.state == "succeed" && (
 					<View className="component-status-succeed">
-						<Icons.success className={"component-status-icon"} color={green["500"]} size={h1 * 1.3} />
+						<Icons.success className={"component-status-icon"} color={green["500"]} size={iconSize} />
 					</View>
 				)}
 
 				{props.state == "error" && (
 					<>
 						<View className="component-status-failed">
-							<Icons.danger className={"component-status-icon"} color={red["500"]} size={h1 * 1.3} />
+							<Icons.danger className={"component-status-icon"} color={red["500"]} size={iconSize} />
 						</View>
 						{textElement()}
 						{(props.enableOk || props.onOkPress) && (
@@ -92,6 +101,7 @@ function ComponentStatus(props: ComponentStatusProps) {
 								backgroundColor={zinc[700]}
 								selectedBackgroundColor={zinc[600]}
 								pressedBackgroundColor={zinc[500]}
+								style={{ pointerEvents: "auto" }}
 							/>
 						)}
 					</>

@@ -13,7 +13,7 @@ import {
 	VideoRef
 } from "react-native-video";
 import { Platform, View } from "react-native";
-import React, { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SubtitleSource, VideoSource, VideoSourceWithoutId } from "../types/media";
 import { HlsProxyConfig, ProxyConfig } from "../types/hls";
 import { CNPLogger } from "../utils/logger";
@@ -230,30 +230,27 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 	});
 
 	/** Reports a source failure to the host. The player's own error UI is unaffected. */
-	const reportPlaybackError = useCallback(
-		(phase: PlayerErrorPhase, message: string, options?: { fatal?: boolean; cause?: unknown; sourceIndex?: number }) => {
-			const handler = onPlaybackErrorRef.current;
-			if (!handler) return;
+	const reportPlaybackError = useCallback((phase: PlayerErrorPhase, message: string, options?: { fatal?: boolean; cause?: unknown; sourceIndex?: number }) => {
+		const handler = onPlaybackErrorRef.current;
+		if (!handler) return;
 
-			const sources = videoSourcesRef.current;
-			const sourceIndex = options?.sourceIndex ?? sources.findIndex((video) => video.id === sourceIdRef.current);
+		const sources = videoSourcesRef.current;
+		const sourceIndex = options?.sourceIndex ?? sources.findIndex((video) => video.id === sourceIdRef.current);
 
-			try {
-				handler({
-					phase,
-					sourceIndex,
-					sourceId: sourceIndex >= 0 ? sources[sourceIndex]?.id : undefined,
-					fatal: options?.fatal ?? true,
-					message,
-					cause: options?.cause
-				});
-			} catch (error) {
-				// A throwing host handler must not take the player down with it.
-				CNPLogger.warn("onError handler threw:", error);
-			}
-		},
-		[]
-	);
+		try {
+			handler({
+				phase,
+				sourceIndex,
+				sourceId: sourceIndex >= 0 ? sources[sourceIndex]?.id : undefined,
+				fatal: options?.fatal ?? true,
+				message,
+				cause: options?.cause
+			});
+		} catch (error) {
+			// A throwing host handler must not take the player down with it.
+			CNPLogger.warn("onError handler threw:", error);
+		}
+	}, []);
 
 	// Fullscreen management hook
 	const { isFullscreen, onFullscreenEnter, onFullscreenExit, requestFullscreen } = useFullscreen({ videoRef, playerViewRef });
@@ -442,66 +439,69 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 	 * ******************
 	 */
 
-	const onError = useCallback((data: OnVideoErrorData | ErrorData) => {
-		if ("target" in data && data.error) {
-			CNPLogger.warn("Native Video Error:", data.error);
-			controlsRef.current?.setControlState({
-				type: "error",
-				message: [data.error.code?.toString() || "400", t("ERROR")]
-			});
-
-			reportPlaybackError("playback", data.error.errorString || data.error.localizedDescription || `Native video error ${data.error.code ?? "400"}`, {
-				cause: data
-			});
-		} else if ("type" in data) {
-			CNPLogger.warn("HLS.js Error:", data);
-
-			// HTTP status behind the failure (e.g. 403/404). hls.js exposes it on `response.code`
-			// for load errors; fall back to the raw XHR status on `networkDetails`.
-			const statusCode =
-				(data as { response?: { code?: number } }).response?.code ?? (data as { networkDetails?: { status?: number } }).networkDetails?.status ?? undefined;
-
-			let stateLabel: string;
-			switch (data.type) {
-				case Hls.ErrorTypes.NETWORK_ERROR:
-					stateLabel = t("NETWORK_ERROR");
-					break;
-				case Hls.ErrorTypes.MEDIA_ERROR:
-					stateLabel = t("DECODE_ERROR");
-					break;
-				case Hls.ErrorTypes.MUX_ERROR:
-					stateLabel = t("DECODE_ERROR");
-					break;
-				default:
-					stateLabel = t("ERROR");
-					break;
-			}
-
-			// Show the status code as the title line (matches the native branch's [code, text] shape),
-			// falling back to a generic "400" when hls.js couldn't surface one (e.g. CORS-blocked).
-			const stateMessage = [statusCode ? String(statusCode) : "400", stateLabel];
-
-			if (data.fatal)
+	const onError = useCallback(
+		(data: OnVideoErrorData | ErrorData) => {
+			if ("target" in data && data.error) {
+				CNPLogger.warn("Native Video Error:", data.error);
 				controlsRef.current?.setControlState({
 					type: "error",
-					message: stateMessage
+					message: [data.error.code?.toString() || "400", t("ERROR")]
 				});
 
-			// Non-fatal hls.js errors are recoverable and hls.js retries on its own, so they are
-			// reported but flagged so the host does not switch away from a healthy source.
-			reportPlaybackError("playback", `${statusCode ? `${statusCode} ` : ""}${data.details ? `${data.type}: ${data.details}` : stateLabel}`, {
-				fatal: data.fatal,
-				cause: data
-			});
-		}
+				reportPlaybackError("playback", data.error.errorString || data.error.localizedDescription || `Native video error ${data.error.code ?? "400"}`, {
+					cause: data
+				});
+			} else if ("type" in data) {
+				CNPLogger.warn("HLS.js Error:", data);
 
-		// If a source switch is in-flight and errors, keep the last known good
-		// playback position intact (don't allow the failed load to overwrite it).
-		if (sourceSwitchInFlightRef.current) {
-			blockPositionUpdatesRef.current = true;
-			sourceSwitchInFlightRef.current = false;
-		}
-	}, [reportPlaybackError]);
+				// HTTP status behind the failure (e.g. 403/404). hls.js exposes it on `response.code`
+				// for load errors; fall back to the raw XHR status on `networkDetails`.
+				const statusCode =
+					(data as { response?: { code?: number } }).response?.code ?? (data as { networkDetails?: { status?: number } }).networkDetails?.status ?? undefined;
+
+				let stateLabel: string;
+				switch (data.type) {
+					case Hls.ErrorTypes.NETWORK_ERROR:
+						stateLabel = t("NETWORK_ERROR");
+						break;
+					case Hls.ErrorTypes.MEDIA_ERROR:
+						stateLabel = t("DECODE_ERROR");
+						break;
+					case Hls.ErrorTypes.MUX_ERROR:
+						stateLabel = t("DECODE_ERROR");
+						break;
+					default:
+						stateLabel = t("ERROR");
+						break;
+				}
+
+				// Show the status code as the title line (matches the native branch's [code, text] shape),
+				// falling back to a generic "400" when hls.js couldn't surface one (e.g. CORS-blocked).
+				const stateMessage = [statusCode ? String(statusCode) : "400", stateLabel];
+
+				if (data.fatal)
+					controlsRef.current?.setControlState({
+						type: "error",
+						message: stateMessage
+					});
+
+				// Non-fatal hls.js errors are recoverable and hls.js retries on its own, so they are
+				// reported but flagged so the host does not switch away from a healthy source.
+				reportPlaybackError("playback", `${statusCode ? `${statusCode} ` : ""}${data.details ? `${data.type}: ${data.details}` : stateLabel}`, {
+					fatal: data.fatal,
+					cause: data
+				});
+			}
+
+			// If a source switch is in-flight and errors, keep the last known good
+			// playback position intact (don't allow the failed load to overwrite it).
+			if (sourceSwitchInFlightRef.current) {
+				blockPositionUpdatesRef.current = true;
+				sourceSwitchInFlightRef.current = false;
+			}
+		},
+		[reportPlaybackError]
+	);
 
 	const onBuffer = useCallback(
 		(data: OnBufferData) => {

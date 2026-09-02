@@ -11,7 +11,7 @@ ProxyLogger.enableDebugging(false);
 const SAMPLE_PLAYER_ID = 'demo-player';
 const initialDummySources: VideoSource[] = [
 	{
-		source: 'https://tears-of-steel-subtitles.s3.amazonaws.com/tos.mp4',
+		source: 'https://tears-of-steel-subtitles.s3.amazonaws.com/toss.mp4',
 		playerId: SAMPLE_PLAYER_ID,
 		label: 'English Source 1',
 		id: 'en-bunny tears-of-steel-main',
@@ -58,6 +58,42 @@ export default function Play() {
 						},
 						{
 							id: 'fr-1',
+							playerId: SAMPLE_PLAYER_ID,
+							source:
+								'https://raw.githubusercontent.com/ImRoodyDev/react-native-cross-player/refs/heads/alpha-1/workspaces/docs/public/media/tears-fr.vtt',
+							langISO: 'fr',
+							label: 'French Subtitle',
+							type: 'vtt',
+						},
+						{
+							id: 'fr-2',
+							playerId: SAMPLE_PLAYER_ID,
+							source:
+								'https://raw.githubusercontent.com/ImRoodyDev/react-native-cross-player/refs/heads/alpha-1/workspaces/docs/public/media/tears-fr.vtt',
+							langISO: 'fr',
+							label: 'French Subtitle',
+							type: 'vtt',
+						},
+						{
+							id: 'fr-3',
+							playerId: SAMPLE_PLAYER_ID,
+							source:
+								'https://raw.githubusercontent.com/ImRoodyDev/react-native-cross-player/refs/heads/alpha-1/workspaces/docs/public/media/tears-fr.vtt',
+							langISO: 'fr',
+							label: 'French Subtitle',
+							type: 'vtt',
+						},
+						{
+							id: 'fr-4',
+							playerId: SAMPLE_PLAYER_ID,
+							source:
+								'https://raw.githubusercontent.com/ImRoodyDev/react-native-cross-player/refs/heads/alpha-1/workspaces/docs/public/media/tears-fr.vtt',
+							langISO: 'fr',
+							label: 'French Subtitle',
+							type: 'vtt',
+						},
+						{
+							id: 'fr-5',
 							playerId: SAMPLE_PLAYER_ID,
 							source:
 								'https://raw.githubusercontent.com/ImRoodyDev/react-native-cross-player/refs/heads/alpha-1/workspaces/docs/public/media/tears-fr.vtt',

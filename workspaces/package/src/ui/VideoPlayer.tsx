@@ -114,7 +114,7 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 	// collapses because `.responsive-vars` is never mounted by a host on native.
 	const responsiveVars = useResponsiveVars();
 	const screenType = useResponsiveSizeType(); // read to trigger re-render on breakpoint change
-	const { h5, span4, span1 } = useResponsiveSize();
+	const { h5, span2, span3, span1 } = useResponsiveSize();
 
 	// Initialize player controller
 	const { nativeVideoProps, playerState, playbackResources, controls } = usePlayerController({
@@ -159,13 +159,14 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>((props, ref) =>
 	// Stable style/prop objects for the native video view (inline literals churn the prop diff).
 	const videoStyleMerged = useMemo(() => [{ width: "100%", height: "auto", margin: "auto" } as ViewStyle, videoStyle], [videoStyle]);
 	const subtitleStyleMerged = useMemo(() => {
-		if (screenType === "mobile_landscape" || screenType === "mobile") {
-			return { fontSize: span4, ...subtitleStyle };
+		if (screenType === "mobile") return { fontSize: span3, ...subtitleStyle };
+		else if (screenType === "mobile_landscape") {
+			return { fontSize: span2, ...subtitleStyle };
 		} else if (screenType === "tablet") {
 			return { fontSize: span1, ...subtitleStyle };
 		}
 		return { fontSize: h5, ...subtitleStyle };
-	}, [h5, span4, span1, screenType, subtitleStyle]);
+	}, [h5, span2, span3, span1, screenType, subtitleStyle]);
 	const rootStyle = useMemo(() => [responsiveVars, viewStyle], [responsiveVars, viewStyle]);
 
 	// Callbacks for source and subtitle changes

@@ -7,7 +7,7 @@ import { Easing, useAnimatedStyle, useSharedValue, withTiming, ZoomIn } from "re
 import useWebKeyboard from "../hooks/useWebKeyboard";
 import useTVRemote from "../hooks/useTVRemote";
 import { useResponsiveSize } from "../hooks/useResponsiveSize";
-import { Platform, StyleSheet, View as RNView, BackHandler } from "react-native";
+import { Platform, StyleSheet, View as RNView, BackHandler, Dimensions } from "react-native";
 import { View, Text, AnimatedView } from "./styled";
 import Button from "./Button";
 import { sky, zinc } from "tailwindcss/colors";
@@ -21,6 +21,7 @@ import { formatTime } from "../utils/helpers";
 import TimeDisplayer from "./TimeDisplayer";
 import { PlaybackResources, PlayerState, VideoControls, AudioTrack, QualityLevel } from "../types/player";
 import { SubtitleSource, VideoSource } from "../types/media";
+import SystemNavigationBar from "react-native-system-navigation-bar";
 
 export type ControlsProps = {
 	videoTitle: string;
@@ -152,6 +153,11 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 		if (latestValuesRef.current.paused || ["error", "loading"].includes(latestValuesRef.current.stateType) || latestValuesRef.current.triggeredDropdown >= 0) {
 			return; // Don't hide
 		}
+
+		// BUG FIX: this will let the navigator act like immersive mode,
+		// because when add immersive mode in the navigator it causes issue with the screen size and insets
+		const { width, height } = Dimensions.get("window");
+		SystemNavigationBar[width > height && Platform.OS !== "web" ? "hide" : "show"]("both");
 
 		visibilityOpacity.value = withTiming(0, { duration: 500, easing: Easing.ease });
 		controlsVisibleRef.current = false;
@@ -373,8 +379,11 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 
 	const statusHiddenStyle = useMemo(() => (state.type !== "idle" ? ({ pointerEvents: "none", opacity: 0 } as const) : undefined), [state.type]);
 	const menusStyle = useMemo(
-		() => [animOpacityStyle, { pointerEvents: Platform.OS === "web" || state.type !== "idle" ? ("none" as const) : ("box-none" as const) }],
-		[animOpacityStyle, state.type]
+		() => [
+			animOpacityStyle,
+			{ pointerEvents: Platform.OS === "web" || (state.type !== "idle" && triggeredDropdown == -1) ? ("none" as const) : ("box-none" as const) }
+		],
+		[animOpacityStyle, triggeredDropdown, state.type]
 	);
 	const actionsStyle = useMemo(() => [{ pointerEvents: Platform.OS === "web" ? ("none" as const) : ("box-none" as const) }], []);
 	const progressStyle = useMemo(() => [animOpacityStyle, { height: sizes.h1 }], [animOpacityStyle, sizes.span6]);
@@ -382,8 +391,8 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 	const sliderContainerStyle = useMemo(() => ({ borderRadius: 999999 }), [sizes.h1]);
 	const sliderTheme = useMemo(
 		() => ({
+			maximumTrackTintColor: "rgba(40, 40, 40, .6)",
 			minimumTrackTintColor: sky[500],
-			maximumTrackTintColor: zinc[700],
 			cacheTrackTintColor: zinc[500],
 			bubbleBackgroundColor: sky[500],
 			...theme
