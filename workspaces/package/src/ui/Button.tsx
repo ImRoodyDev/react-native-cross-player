@@ -39,6 +39,7 @@ const Button = React.forwardRef((props: ButtonProps, ref?: Ref<RNView>) => {
 		borderRadius,
 		focusOutlined,
 		className,
+		enableRipple = Platform.OS === "web",
 		focusOutlineColor = "white",
 		...baseButtonProps
 	} = props;
@@ -68,7 +69,7 @@ const Button = React.forwardRef((props: ButtonProps, ref?: Ref<RNView>) => {
 	if (props.hideAndDisable) return null;
 
 	return (
-		<CustomButton ref={ref} enableRipple {...baseButtonProps} className={clsx(className, "gap-3")} style={extractedStyle}>
+		<CustomButton ref={ref} {...baseButtonProps} className={clsx(className, "gap-3")} style={extractedStyle}>
 			{({ currentTextColor }) => (
 				<>
 					{icon &&

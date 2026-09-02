@@ -690,9 +690,6 @@
 
 /* Mobile Landscape */
 @media only screen and (max-width: 1023px) and (max-height: 479px) {
-	.cnp-plyr-close-btn {
-		width: var(--h2-size);
-	}
 	.cnp-player-title {
 		font-size: var(--span3-size);
 	}
