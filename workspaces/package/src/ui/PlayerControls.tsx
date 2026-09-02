@@ -67,7 +67,7 @@ const ControlButton = memo(
 			backgroundColor={"transparent"}
 			selectedBackgroundColor={zinc[700]}
 			pressedBackgroundColor={zinc[600]}
-			enableRipple={!Platform.isTV}
+			enableRipple={Platform.OS === "web"}
 			{...props}
 		/>
 	))
