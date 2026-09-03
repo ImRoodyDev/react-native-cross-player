@@ -57,6 +57,16 @@ export function isAbsoluteURL(u: string): boolean {
 }
 
 /**
+ * Ensure a source URL carries a scheme before it reaches the native player. Protocol-relative
+ * URLs (`//host/path`) resolve in browsers but not in ExoPlayer/AVPlayer, which treat a
+ * scheme-less URI as a local file. Prepends `https:`; every other scheme (file://, blob:,
+ * content://, http(s)://, data:) is left untouched.
+ */
+export function normalizeSourceURL(source: string): string {
+	return typeof source === "string" && source.startsWith("//") ? `https:${source}` : source;
+}
+
+/**
  * Append query params to a URL, choosing `?` or `&` automatically. Used to attach
  * proxy-auth query (e.g. a `token`) to a resolved proxy URL. Returns the URL
  * unchanged when there are no params.

@@ -83,7 +83,7 @@
 	position: absolute;
 	aspect-ratio: 1;
 	border-radius: 999999px;
-	background-color: theme("colors.zinc.900");
+	background-color: #28282899;
 }
 
 /*#endregion */
@@ -270,7 +270,7 @@
 .cnp-player-time-text,
 .cnp-player-time-separator {
 	color: white;
-	font-size: var(--span3-size);
+	font-size: var(--span4-size);
 	font-family: Montserrat-Medium, sans-serif;
 }
 

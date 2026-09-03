@@ -203,12 +203,49 @@ async function ensureDirectoryExists(filePath: string): Promise<void> {
 	}
 }
 
-/*  Build a file path inside the platform cache for a given group and filename. */
+/**
+ * Build a file path inside the platform cache for a given group and filename.
+ * Both segments are sanitized so the name written to disk matches the file:// URI
+ * the player later opens — native players percent-decode file URIs, so a raw name
+ * with % [ ] : + or spaces would be written encoded but opened decoded → not found.
+ *
+ * @example
+ * // dir     = "/data/user/0/com.ztoor/cache"
+ * // filename = "en-vixsrc-%5BVixSrc%5D%5BM3U8%5D+%2D+English+-cb320aee.m3u8"
+ * // group    = ":r2:"
+ * formatNativePATH(dir, filename, group);
+ * // → "/data/user/0/com.ztoor/cache/CNP_Cache/r2/en-vixsrc-VixSrc-M3U8-English-cb320aee.m3u8"
+ */
 function formatNativePATH(dir: string, filename: string, group?: string): string {
-	if (group) {
-		return `${dir}/${DIR_FOLDER}/${group}/${filename}`;
-	} else {
-		return `${dir}/${DIR_FOLDER}/default/${filename}`;
+	const safeGroup = group ? sanitizePathSegment(group) || "default" : "default";
+	const safeName = filename ? sanitizeFileName(filename) : filename;
+	return `${dir}/${DIR_FOLDER}/${safeGroup}/${safeName}`;
+}
+
+/*  Reduce a string to a safe single path segment: decode any URL-encoding, then
+ *  collapse everything outside [a-zA-Z0-9._-] to single hyphens and trim the edges. */
+function sanitizePathSegment(input: string): string {
+	return safeDecodeURIComponent(input)
+		.replace(/[^a-zA-Z0-9._-]+/g, "-")
+		.replace(/^[-.]+|[-.]+$/g, "")
+		.replace(/-{2,}/g, "-");
+}
+
+/*  Sanitize a filename while preserving its extension (e.g. `.m3u8`, `.vtt`). */
+function sanitizeFileName(filename: string): string {
+	const dot = filename.lastIndexOf(".");
+	const base = dot > 0 ? filename.slice(0, dot) : filename;
+	const ext = dot > 0 ? filename.slice(dot + 1).replace(/[^a-zA-Z0-9]+/g, "") : "";
+	const safeBase = sanitizePathSegment(base) || "cnp";
+	return ext ? `${safeBase}.${ext}` : safeBase;
+}
+
+/*  Decode percent-encoding (and `+` as space) without throwing on malformed input. */
+function safeDecodeURIComponent(input: string): string {
+	try {
+		return decodeURIComponent(input.replace(/\+/g, " "));
+	} catch {
+		return input;
 	}
 }
 

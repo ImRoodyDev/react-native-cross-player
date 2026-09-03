@@ -13,6 +13,7 @@ type Props = {
 	tap?: number;
 	autoHide?: boolean;
 	disable?: boolean;
+	disableTouch?: boolean;
 };
 
 const AnimationDuration = 300;
@@ -38,10 +39,10 @@ const PlayerGesture = forwardRef<PlayerGestureRef, Props>((props, ref) => {
 			animatedOpacity.value = withTiming(1, { duration: AnimationDuration, easing: Easing.ease });
 			animatedScale.value = withTiming(1, { duration: AnimationDuration, easing: Easing.ease });
 		}
-	}, [props.autoHide]);
+	}, [props.autoHide, props.disable]);
 
 	const animateTouch = useCallback(() => {
-		if (props.disable) return;
+		if (props.disable || props.disableTouch) return;
 
 		// Show then auto-hide
 		animatedOpacity.value = withSequence(
@@ -50,7 +51,7 @@ const PlayerGesture = forwardRef<PlayerGestureRef, Props>((props, ref) => {
 		);
 
 		animatedScale.value = withSequence(withSpring(1), withDelay(ResetDelay, withTiming(0, { duration: AnimationDuration, easing: Easing.in(Easing.ease) })));
-	}, [props.autoHide, props.disable]);
+	}, [props.autoHide, props.disable, props.disableTouch]);
 
 	const doubleTap = Gesture.Tap()
 		.numberOfTaps(props.tap || 2)
@@ -67,7 +68,7 @@ const PlayerGesture = forwardRef<PlayerGestureRef, Props>((props, ref) => {
 	if (props.disable) return null;
 
 	return (
-		<View className={"cnp-player-gesture"}>
+		<View className={"cnp-player-gesture"} style={[props.disableTouch && { pointerEvents: "none" }]}>
 			<GestureDetector gesture={doubleTap}>
 				<View className={"cnp-player-gesture-ctn"}>
 					<AnimatedView

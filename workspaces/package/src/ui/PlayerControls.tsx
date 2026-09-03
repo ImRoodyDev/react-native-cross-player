@@ -100,12 +100,16 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 	const [triggeredDropdown, setTriggeredDropdown] = React.useState(-1);
 	const [state, dispatch] = useComponentStateReducer({ type: "loading", message: t("PREPARING") });
 	const [controlsVisible, setControlVisibility] = React.useState(true);
+	const [duration, setDuration] = React.useState(0);
 
 	const controlsVisibleRef = useRef(true);
 	const playButtonRef = useRef<RNView | null>(null);
 	const seekBackwardGestureRef = useRef<PlayerGestureRef>(null);
 	const seekForwardGestureRef = useRef<PlayerGestureRef>(null);
 	const playGestureRef = useRef<PlayerGestureRef>(null);
+	// True while the user is actively dragging the scrubber; suppresses progress-driven
+	// thumb updates so the thumb doesn't snap back, and defers the seek until release.
+	const isScrubbingRef = useRef(false);
 
 	// Node kept in state as well: `nextFocusDown` needs the mounted view, and a ref alone never
 	// re-renders the close button to apply it (it only ever landed by luck on an unrelated render).
@@ -249,6 +253,22 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 	const selectAudio = useCallback((_: AudioTrack, index: number) => props.controls.setAudioTrack(index), [props.controls]);
 	const seekTo = useCallback((value: number) => props.controls.setCurrentTime(value), [props.controls]);
 
+	// Scrub handlers: seek once on release (not on every drag tick). onSlidingStart flags the
+	// drag so onProgress stops moving the thumb; onSlidingComplete optimistically pins the thumb
+	// at the released position, then issues the single authoritative seek.
+	const onScrubStart = useCallback(() => {
+		isScrubbingRef.current = true;
+		showControls();
+	}, [showControls]);
+	const onScrubComplete = useCallback(
+		(value: number) => {
+			isScrubbingRef.current = false;
+			playerCurrentTime.value = value;
+			seekTo(value);
+		},
+		[seekTo, playerCurrentTime]
+	);
+
 	// `t()` is a plain lookup, so keep resolving it every render; the memo only rebuilds the array
 	// when the label or the list actually changes (so a language switch still propagates).
 	const subtitlesOffLabel = t("SUBTITLES_OFF");
@@ -325,9 +345,11 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 			onLoad: (event: OnLoadData) => {
 				playerCurrentTime.value = event.currentTime;
 				playerDurationTime.value = event.duration;
+				setDuration(event.duration);
 			},
 			onProgress: (event: OnProgressData) => {
-				playerCurrentTime.value = event.currentTime;
+				// While scrubbing, let the drag own the thumb — don't yank it back to playback position.
+				if (!isScrubbingRef.current) playerCurrentTime.value = event.currentTime;
 				playerPlayableTime.value = event.playableDuration;
 			},
 			setControlState: (action: Action) => {
@@ -379,7 +401,7 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 		opacity: visibilityOpacity.value
 	}));
 
-	const statusHiddenStyle = useMemo(() => (state.type !== "idle" ? ({ pointerEvents: "none", opacity: 0 } as const) : undefined), [state.type]);
+	const actionsStyle = useMemo(() => [{ pointerEvents: Platform.OS === "web" ? ("none" as const) : ("box-none" as const) }], []);
 	const menusStyle = useMemo(
 		() => [
 			animOpacityStyle,
@@ -387,13 +409,12 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 		],
 		[animOpacityStyle, triggeredDropdown, state.type]
 	);
-	const actionsStyle = useMemo(() => [{ pointerEvents: Platform.OS === "web" ? ("none" as const) : ("box-none" as const) }], []);
 	const progressStyle = useMemo(() => [animOpacityStyle, { height: sizes.h1 }], [animOpacityStyle, sizes.span6]);
 	const sliderStyle = useMemo(() => ({ height: sizes.h1, borderRadius: 999999 }), [sizes.h1]);
 	const sliderContainerStyle = useMemo(() => ({ borderRadius: 999999 }), [sizes.h1]);
 	const sliderTheme = useMemo(
 		() => ({
-			maximumTrackTintColor: "rgba(40, 40, 40, .6)",
+			maximumTrackTintColor: "#28282899",
 			minimumTrackTintColor: sky[500],
 			cacheTrackTintColor: zinc[500],
 			bubbleBackgroundColor: sky[500],
@@ -425,16 +446,31 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 					</AnimatedView>
 				</FocusGuide>
 
-				<View className={"cnp-player-gestures"} style={statusHiddenStyle}>
-					<PlayerGesture ref={seekBackwardGestureRef} icon={"backward_10_seconds"} onPress={seekBackward} autoHide disable={props.playerState.isLive} />
+				<View className={"cnp-player-gestures"}>
+					<PlayerGesture
+						ref={seekBackwardGestureRef}
+						icon={"backward_10_seconds"}
+						onPress={seekBackward}
+						autoHide
+						disable={props.playerState.isLive || duration <= 0 || state.type == "error"}
+						disableTouch={duration <= 0}
+					/>
 					<PlayerGesture
 						ref={playGestureRef}
 						icon={props.playerState.paused ? "play" : "pause"}
 						onPress={togglePlay}
 						tap={1}
 						autoHide={!props.playerState.paused}
+						disable={state.type !== "idle" || duration <= 0}
 					/>
-					<PlayerGesture ref={seekForwardGestureRef} icon={"forward_10_seconds"} onPress={seekForward} autoHide disable={props.playerState.isLive} />
+					<PlayerGesture
+						ref={seekForwardGestureRef}
+						icon={"forward_10_seconds"}
+						onPress={seekForward}
+						autoHide
+						disable={props.playerState.isLive || duration <= 0 || state.type == "error"}
+						disableTouch={duration <= 0}
+					/>
 				</View>
 
 				<View className={"cnp-player-actions"} style={actionsStyle}>
@@ -502,8 +538,10 @@ const PlayerControls = forwardRef((props: ControlsProps, ref?: Ref<PlayerControl
 						minimumValue={playerMinDuration}
 						maximumValue={playerDurationTime}
 						cache={playerPlayableTime}
-						// Configurations
-						onValueChange={seekTo}
+						// Configurations: seek once on release, not on every drag tick (avoids
+						// flooding the native player with seeks it drops while buffering).
+						onSlidingStart={onScrubStart}
+						onSlidingComplete={onScrubComplete}
 						bubble={formatTime}
 						hapticMode={"step"}
 						forceSnapToStep={false}

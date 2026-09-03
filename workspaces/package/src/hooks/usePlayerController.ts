@@ -192,6 +192,7 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 
 	// States and refs
 	const isMountedRef = useRef(true); // Track if component is mounted
+	const isBufferingRef = useRef<boolean>(false);
 	const bufferTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined); // For buffering debounce
 	const lastPositionRef = useRef<number>(startPosition || 0);
 	const pendingSeekRef = useRef<number | undefined>(undefined);
@@ -418,6 +419,11 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 
 			lastPositionRef.current = seekTime;
 			CNPLogger.info(`Applied pending ${pendingSeekSource} seek:`, seekTime);
+
+			// A native seek() during buffering doesn't throw even when the player silently drops it,
+			// so keep a user seek pending until buffering ends (onBuffer re-applies it); onProgress
+			// then confirms the position and clears it. Other cases clear immediately as before.
+			if (pendingSeekSource === "user" && isBufferingRef.current && Platform.OS !== "web") return;
 			clearPendingSeek();
 		} catch (error) {
 			if (pendingSeekAttemptsRef.current < 15) {
@@ -509,7 +515,7 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 			// If not sources is set or selected should ignore settign this to loading or idle state
 			if (sourceId === -1 || videoSources.length < 1) return;
 
-			const isBuffering = data.isBuffering;
+			isBufferingRef.current = data.isBuffering;
 
 			// Cancel any pending debounce on every transition, so a stale timer from an intermediate
 			// `true` (buffering toggles during a seek) can't strand the controls in loading.
@@ -518,9 +524,14 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 				bufferTimeoutRef.current = undefined;
 			}
 
-			if (!isBuffering) {
+			if (!isBufferingRef.current) {
 				// Buffering ended → clear our own loading immediately, but never stomp an error state.
 				if (controlsRef.current?.state.type === "loading") controlsRef.current?.setControlState({ type: "idle", message: "" });
+				CNPLogger.debug("Buffering ended, cleared loading state.");
+				// A user seek requested mid-buffer was retained (not cleared) — apply it now that the
+				// player is ready. onProgress then confirms the position and clears it. Skipped during
+				// a source switch: the source-change seek is applied by onLoad once metadata is ready.
+				if (!blockPositionUpdatesRef.current && pendingSeekRef.current !== undefined && isValidTime(pendingSeekRef.current)) applyPendingSeek();
 				return;
 			}
 
@@ -528,8 +539,10 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 			bufferTimeoutRef.current = setTimeout(() => {
 				bufferTimeoutRef.current = undefined;
 				controlsRef.current?.setControlState({ type: "loading", message: t("LOADING") });
+				CNPLogger.debug("Buffering started, showing loading state.");
 			}, 500);
 		},
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 		[sourceId, videoSources]
 	);
 
@@ -817,6 +830,11 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 					return;
 				}
 
+				// Reflect the switch in the UI immediately: show loading and clear any prior error
+				// state so a failed source's error doesn't linger while the next source prepares.
+				// Applies to both native and HLS paths, and covers lazy-resolve latency below.
+				controlsRef.current?.setControlState({ type: "loading", message: t("PREPARING") });
+
 				// Add video source if not already created
 				if (!createdSourcesRef.current.has(video.id)) await addVideoSource(video);
 				const createdSource = createdSourcesRef.current.get(video.id);
@@ -842,8 +860,8 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 				stopLoadSource();
 
 				// If format is HLS and supported, use HlsProxy to set source
+				// (loading state is already set above, before the switch began).
 				if (isHlsSupported && video.format === "m3u8") {
-					controlsRef.current?.setControlState({ type: "loading", message: t("PREPARING") });
 					if (!hlsCreated) createHLS();
 					hlsSetSource(createdSource.source, createdSource.options, startTime);
 					CNPLogger.info("HLS Proxy source set:", { uri: createdSource.source, options: createdSource.options, startTime });
@@ -1112,8 +1130,13 @@ export function usePlayerController(props: PlayerControllerProps): PlayerControl
 				}
 			}
 
-			if (pendingSeekRef.current !== undefined && isValidTime(pendingSeekRef.current)) {
-				applyPendingSeek();
+			// Skip during a source switch: position reports are stale (old source), and the
+			// source-change seek is owned by onLoad — otherwise a stale tick could clear it early.
+			if (!blockPositionUpdatesRef.current && pendingSeekRef.current !== undefined && isValidTime(pendingSeekRef.current)) {
+				// Reached the pending target (within tolerance) → clear. While buffering, let onBuffer
+				// re-apply on the buffering→idle edge instead of re-seeking on every progress tick.
+				if (typeof e.currentTime === "number" && Math.abs(e.currentTime - pendingSeekRef.current) <= 1.5) clearPendingSeek();
+				else if (!isBufferingRef.current) applyPendingSeek();
 			}
 			controlsRef.current?.onProgress(e);
 		},

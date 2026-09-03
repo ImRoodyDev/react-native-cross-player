@@ -62,7 +62,7 @@ export const sizes = {
 		span4: 12,
 		span5: 10,
 		span6: 6,
-		outlineWidth: 2
+		outlineWidth: 1
 	},
 	mobile_landscape: {
 		sidePadding: 22,
@@ -81,7 +81,7 @@ export const sizes = {
 		span4: 12,
 		span5: 10,
 		span6: 6,
-		outlineWidth: 2
+		outlineWidth: 1
 	}
 };
 
