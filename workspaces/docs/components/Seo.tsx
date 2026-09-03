@@ -14,6 +14,33 @@ export const OG_IMAGE = `${SITE_URL}/img/ctn-square.png`;
 const DEFAULT_DESCRIPTION =
 	'React Native + Web video player wrapper with HLS streaming, VTT subtitles, proxy support, and a controller API for building custom playback UIs.';
 
+/**
+ * Site-wide keywords meta. Note: Google ignores this tag for ranking — the phrases
+ * that actually rank live in each page's title, description, and visible content.
+ * Kept for the minor engines that still read it and as a canonical term list.
+ */
+export const SITE_KEYWORDS = [
+	'react-native-cross-player',
+	'react native video',
+	'react native player',
+	'react native video player',
+	'react native player controls',
+	'react native video controls',
+	'react native hls',
+	'react native hls player',
+	'react native m3u8',
+	'react native subtitles',
+	'react native captions',
+	'react native web video',
+	'expo video player',
+	'expo video',
+	'hls streaming',
+	'm3u8 player',
+	'video player controls',
+	'usePlayerController',
+	'cross platform video player',
+].join(', ');
+
 type Meta = { title: string; description: string };
 
 /**
@@ -129,6 +156,7 @@ export function Seo({ title, description, path }: SeoProps) {
 		<Head>
 			<title>{finalTitle}</title>
 			<meta name="description" content={finalDescription} />
+			<meta name="keywords" content={SITE_KEYWORDS} />
 			<link rel="canonical" href={canonical} />
 
 			<meta property="og:type" content="website" />
