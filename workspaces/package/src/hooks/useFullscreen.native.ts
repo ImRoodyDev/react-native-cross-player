@@ -58,7 +58,7 @@ export function useFullscreen(props: UseFullscreenProps): UseFullscreenResult {
 			// Hide system UI (immersive mode on Android, hide status bar on iOS)
 			// SystemNavigationBar.setImmersive("immersive", true); // Android: hides both bars, swipe to reveal
 			// Alternatively you can use granular methods:
-			SystemNavigationBar.hide("both");
+			SystemNavigationBar.show("both");
 			// SystemNavigationBar.setStatusBarHidden(true);
 			// SystemNavigationBar.setNavigationBarHidden(true);
 		};
